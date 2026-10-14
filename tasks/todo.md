@@ -366,4 +366,5 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 |------|--------|-------|
 | Phase −1 (design package) | done | Stitch package exported to `docs/design/` — DESIGN.md, code.html, screen.png, tokens.json (47 color tokens verified identical across all 4 screens and vs `namedColors`), reference variants. See `docs/design/README.md`. |
 | Phase −1 (layout decision) | done | **Two-column dashboard is canonical** (human, 2026-10-14) — ADR-004. `code.html`/`screen.png` swapped to the two-column screen; single-column discarded (Focus Shroud markup salvaged to `screens/focus-shroud-snippet.html`). PRD §1/§4.1 updated; Tasks 7, 10, 12, 18, 26 re-scoped. |
-| 1–28 | not started | |
+| 1 | done | Next 16.4 + React 19.3 + TS 5.9 + Tailwind 4.3 + vitest 5.0 + Playwright 1.64. `dev/build/lint/test` all green; smoke test proves vitest wiring. `@types/node` bumped ^20→^24 (runtime is Node 24; vitest 5 requires ≥24). Dropped `vite-tsconfig-paths` — Vite resolves paths natively (49s→1.5s). |
+| 2–28 | not started | |
