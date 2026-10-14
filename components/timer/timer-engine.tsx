@@ -45,9 +45,12 @@ export function TimerEngine() {
   return (
     <section
       aria-label="Timer engine"
-      className="flex flex-col items-center justify-center"
+      className="flex w-full max-w-md flex-col items-center justify-center"
     >
-      <div className="relative flex aspect-square w-full max-w-md items-center justify-center">
+      {/* `@container` so the readout can size itself to the ring rather than
+          to the viewport — the digits nest inside the circle at every width
+          instead of overflowing it on a narrow one. */}
+      <div className="relative flex aspect-square w-full @container items-center justify-center">
         <ProgressRing variant={RING_VARIANT[state.status]} progress={progress} />
         <TimerReadout
           remaining={remaining}

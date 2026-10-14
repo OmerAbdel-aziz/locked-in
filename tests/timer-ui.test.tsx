@@ -155,6 +155,23 @@ describe("the progress ring matches the design's geometry", () => {
       unmount();
     }
   });
+
+  it("gives the ring a definite width instead of collapsing to its content", () => {
+    render(<TimerEngine />);
+
+    const section = screen.getByRole("region", { name: "Timer engine" });
+    const ringWrapper = section.firstElementChild;
+
+    // The ring is `w-full` inside a shrink-to-fit flex item, so without a
+    // definite width on the item itself it resolves against its own content
+    // — the digits — and the circle collapses to the width of the face. It
+    // did exactly that before this fix, which is why the assertion is on the
+    // section rather than the ring.
+    expect(section.className).toContain("max-w-md");
+    expect(ringWrapper?.className).toMatch(/aspect-square/);
+    // …and the readout sizes itself to that ring via container query units.
+    expect(ringWrapper?.className).toContain("@container");
+  });
 });
 
 describe("the readout", () => {
@@ -170,6 +187,10 @@ describe("the readout", () => {
     // JetBrains Mono is the "interface's heartbeat" (DESIGN.md §3) — the
     // digits are the one place a proportional font would be wrong.
     expect(digits?.className).toContain("font-mono");
+    // Sized against the ring, not the viewport. A fixed px size made the
+    // face overflow the circle on a narrow one; the design keeps the digits
+    // just under 60% of the ring's diameter.
+    expect(digits?.className).toContain("text-[22cqw]");
   });
 
   it("formats mm:ss, rounding up so a fresh phase does not open on 24:59", () => {
