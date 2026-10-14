@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Env files — PRD §9: never store secrets in the repo
+.env
+.env.*
+!.env.example
+
+# Local tool config that embeds a live API key (Stitch).
+# Preserve the file locally (Task 1), but never commit it.
+opencode.json
+
+# Scratch
+.stitchtmp/
+*.tsbuildinfo
+next-env.d.ts
