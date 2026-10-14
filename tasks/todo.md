@@ -55,12 +55,21 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 3: Convex init + schema v1 with indexes
 **Description:** Initialize Convex, define schema: `identities`, `users`, `projects`, `tasks`, `sessions`, `settings` exactly per PRD §6, with indexes needed by stats (`sessions: by_owner_completed`, `tasks: by_owner_active`) and ordering (fractional `order` on tasks).
 **Acceptance:**
-- [ ] Schema matches PRD §6 field-for-field (incl. `tzOffsetAtCompletion`, `projectId` snapshot field)
-- [ ] Indexes cover: owner+completedAt range, owner+taskId, owner+day derivations
+- [x] Schema matches PRD §6 field-for-field (incl. `tzOffsetAtCompletion`, `projectId` snapshot field)
+- [x] Indexes cover: owner+completedAt range, owner+taskId, owner+day derivations
 **Verification:** `npx convex dev` pushes schema; typecheck passes.
 **Dependencies:** Task 1
 **Files:** convex/schema.ts, convex/*.indexes (if applicable)
 **Scope:** S
+
+**Notes:**
+- Live deployment: `omer-abdelaziz:locked-in-12357:dev` (project `locked-in-12357`, dashboard `dashing-caribou-892`). All 6 tables and all 10 indexes confirmed pushed.
+- **Day derivations need no `dayKey` column.** A calendar day at `tzOffsetAtCompletion` is a bounded `completedAt` range, so `by_owner_completed` serves it and the schema stays exactly as PRD §6 specifies — adding a denormalized field would itself be a schema change needing sign-off.
+- **Index naming deviates from Convex's own guideline** (which prefers `by_field1_and_field2`, i.e. `by_owner_and_completedAt`). This task and PRD §6 name the indexes explicitly, so the spec wins; the deployment accepts them.
+- `convex/_generated/` is **committed** — typecheck fails without it, and Convex's codegen output says so.
+- `.env.local` (written by `convex dev`, holds `CONVEX_DEPLOYMENT` + URLs) stays ignored by the `.env*` rule.
+
+**Gate:** `tests/convex-schema.test.ts` (11 assertions) reads the schema object Convex itself builds — not a hand-maintained mirror — and asserts the six tables, every field with its exact optionality, the `focus|short|long` union, that `sessions` stores nothing ADR-003 says must be derived, and all six index-coverage requirements. Mutation-tested: dropping `tzOffsetAtCompletion`, forcing `archivedAt` required, deleting `by_owner_completed`, injecting a `streak` column, and removing `long` from the phase union each fail it.
 
 ### Task 4: Anonymous identity + owner-resolution helper
 **Description:** Convex Auth anonymous sign-in on first visit; single `resolveOwner` helper every function uses (session token → identity → ownerId, handling the linked-user case from ADR-002).
@@ -374,5 +383,5 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 | Phase −1 (layout decision) | done | **Two-column dashboard is canonical** (human, 2026-10-14) — ADR-004. `code.html`/`screen.png` swapped to the two-column screen; single-column discarded (Focus Shroud markup salvaged to `screens/focus-shroud-snippet.html`). PRD §1/§4.1 updated; Tasks 7, 10, 12, 18, 26 re-scoped. |
 | 1 | done | Next 16.4 + React 19.3 + TS 5.9 + Tailwind 4.3 + vitest 5.0 + Playwright 1.64. `dev/build/lint/test` all green; smoke test proves vitest wiring. `@types/node` bumped ^20→^24 (runtime is Node 24; vitest 5 requires ≥24). Dropped `vite-tsconfig-paths` — Vite resolves paths natively (49s→1.5s). |
 | 2 | done | All 47 colors + radius + fonts ported into Tailwind **v4 `@theme`** in `app/globals.css` (no `tailwind.config.ts` — see deviation note). Inter + JetBrains Mono self-hosted via `next/font`; Material Symbols **deferred** (not in `next/font`'s 1942-font catalog; multi-MB external `<link>` — revisit at Task 7). Base layer enforces body `#131313` / text `#e5e2e1`, `ease-sanctuary`, `cta-gradient`, `glass-panel`. Verified by screenshot + computed styles (`bodyBg` `rgb(19,19,19)`, digits in JetBrains Mono, **zero** elements painted white) and locked in by `tests/design-tokens.test.ts`. |
-| 3 | **blocked (schema written)** | `convex` 1.46.0 installed; `convex/schema.ts` written field-for-field vs PRD §6 with `by_owner_completed`, `by_owner_active` (+ fractional order), `by_owner_task`, and day derivation served as a bounded `completedAt` range (no `dayKey` smuggled in). **Blocked on Convex OAuth:** `npx convex codegen` needs a configured deployment, and *both* `--dev-deployment local` and cloud open the login flow — needs a human at the browser. Consequence: `convex/_generated/` doesn't exist, so Task 3's verification (`npx convex dev` pushes schema) and anything importing `api` are still unverified. Nothing imports it yet, so lint/test/build stay green. |
+| 3 | done | `convex` 1.46.0 + project `locked-in-12357` (dev deployment `dashing-caribou-892`). All 6 PRD §6 tables and all 10 indexes pushed and confirmed live. Day derivation served as a bounded `completedAt` range — **no `dayKey` column smuggled in**, so the schema stays exactly PRD §6. `convex/_generated/` committed (typecheck needs it); `npx convex codegen`/`dev` both require the human OAuth step, done manually. Lint/`tsc --noEmit`/build/test green. Gated by `tests/convex-schema.test.ts` (mutation-tested ×5). |
 | 4–28 | not started | |

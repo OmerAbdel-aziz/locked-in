@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Convex regenerates this on every `npx convex dev`; linting it only
+    // produces warnings we can never fix (its eslint-disable headers are
+    // correct for Convex's own config, not ours).
+    "convex/_generated/**",
   ]),
 ]);
 
