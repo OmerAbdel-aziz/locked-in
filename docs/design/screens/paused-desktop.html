@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#3a3939",
+                    "on-primary-container": "#004b1e",
+                    "secondary-fixed": "#b2f2b7",
+                    "background": "#131313",
+                    "surface-tint": "#4ae176",
+                    "error-container": "#93000a",
+                    "inverse-on-surface": "#313030",
+                    "tertiary-fixed-dim": "#ffb4a9",
+                    "primary-fixed": "#6bff8f",
+                    "on-error": "#690005",
+                    "surface-container": "#201f1f",
+                    "surface": "#131313",
+                    "on-surface-variant": "#bccbb9",
+                    "on-surface": "#e5e2e1",
+                    "surface-container-highest": "#353534",
+                    "primary": "#4be277",
+                    "secondary-container": "#175428",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-background": "#e5e2e1",
+                    "surface-dim": "#131313",
+                    "on-secondary-fixed": "#002109",
+                    "on-tertiary-container": "#76231b",
+                    "tertiary-fixed": "#ffdad5",
+                    "secondary-fixed-dim": "#96d59d",
+                    "primary-fixed-dim": "#4ae176",
+                    "on-secondary-container": "#89c78f",
+                    "primary-container": "#22c55e",
+                    "error": "#ffb4ab",
+                    "on-primary-fixed-variant": "#005321",
+                    "secondary": "#96d59d",
+                    "on-primary-fixed": "#002109",
+                    "on-secondary": "#003915",
+                    "outline": "#869585",
+                    "tertiary-container": "#ff8b7c",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-variant": "#353534",
+                    "on-primary": "#003915",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-fixed": "#410001",
+                    "on-tertiary-fixed-variant": "#7f2a21",
+                    "on-tertiary": "#60130d",
+                    "on-error-container": "#ffdad6",
+                    "outline-variant": "#3d4a3d",
+                    "inverse-primary": "#006e2f",
+                    "inverse-surface": "#e5e2e1",
+                    "on-secondary-fixed-variant": "#145126",
+                    "tertiary": "#ffb5ab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"],
+                    "mono": ["JetBrains Mono"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #131313; color: #e5e2e1; }
+        .timer-display { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel { background: rgba(19, 19, 19, 0.6); backdrop-filter: blur(20px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="min-h-screen selection:bg-primary/30 flex flex-col overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="bg-[#131313] flex justify-between items-center px-8 h-16 w-full max-w-screen-2xl mx-auto fixed top-0 left-0 right-0 z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-[#E5E2E1]">Locked In</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#4BE277] border-b-2 border-[#4BE277] pb-1 font-bold text-sm" href="#">Focus</a>
+<a class="text-[#E5E2E1]/60 font-medium hover:text-[#E5E2E1] transition-colors duration-200 ease-in-out text-sm" href="#">Short Break</a>
+<a class="text-[#E5E2E1]/60 font-medium hover:text-[#E5E2E1] transition-colors duration-200 ease-in-out text-sm" href="#">Long Break</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="px-3 py-1 bg-surface-container-highest rounded-full text-xs font-bold text-[#4BE277] tracking-tight">
+                Streak: 5
+            </div>
+<button class="material-symbols-outlined text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors">settings</button>
+<button class="material-symbols-outlined text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors">account_circle</button>
+</div>
+</header>
+<main class="flex-grow pt-24 pb-20 px-8 max-w-7xl mx-auto w-full grid grid-cols-12 gap-12">
+<!-- Left Column: Timer Engine -->
+<div class="col-span-12 lg:col-span-7 flex flex-col items-center justify-center">
+<div class="relative w-full max-w-md aspect-square flex items-center justify-center">
+<!-- Outer Ring (Paused State) -->
+<svg class="absolute w-full h-full transform -rotate-90">
+<circle class="text-surface-container-highest/20" cx="50%" cy="50%" fill="transparent" r="48%" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-surface-container-highest" cx="50%" cy="50%" fill="transparent" r="48%" stroke="currentColor" stroke-dasharray="100 100" stroke-linecap="round" stroke-width="4"></circle>
+</svg>
+<div class="text-center z-10">
+<span class="inline-block px-3 py-1 bg-surface-container-low rounded-full text-[10px] font-bold tracking-widest text-on-surface-variant mb-4 uppercase">
+                        Session 3 of 4
+                    </span>
+<h1 class="timer-display text-[120px] font-bold leading-none tracking-tighter text-on-surface">
+                        25:00
+                    </h1>
+</div>
+</div>
+<div class="w-full max-w-md mt-12 space-y-6">
+<!-- Control Button -->
+<button class="w-full py-5 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-lg tracking-tight active:scale-95 transition-all duration-150 shadow-[0_20px_50px_-12px_rgba(75,226,119,0.2)]">
+                    Start Focus Session
+                </button>
+<!-- Active Task Card (Glassmorphism) -->
+<div class="glass-panel border border-outline-variant/10 p-6 rounded-xl space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-xs font-semibold text-on-surface-variant tracking-wider uppercase">Currently Active</span>
+</div>
+<button class="material-symbols-outlined text-sm opacity-40 hover:opacity-100">more_horiz</button>
+</div>
+<p class="text-xl font-semibold text-on-surface">Finalize Q2 pitch deck</p>
+<div class="space-y-2">
+<div class="flex justify-between text-[10px] text-on-surface-variant font-mono">
+<span>Progress</span>
+<span>4 / 8 Pomodoros</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 50%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Task Management (Editorial Bento) -->
+<div class="col-span-12 lg:col-span-5 space-y-8">
+<section>
+<div class="flex justify-between items-end mb-6">
+<h2 class="text-2xl font-bold tracking-tight">Today's Focus</h2>
+<span class="text-xs text-on-surface-variant font-mono">3 / 8 COMPLETED</span>
+</div>
+<div class="relative mb-6 group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 group-focus-within:text-primary transition-colors">add</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-4 focus:ring-1 focus:ring-primary/30 placeholder:text-on-surface-variant/30 text-sm transition-all" placeholder="Add new task..." type="text"/>
+</div>
+<div class="space-y-3">
+<!-- Task Item 1 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors rounded-xl border-l-2 border-primary">
+<div class="flex items-center gap-4">
+<button class="w-5 h-5 rounded border border-outline-variant group-hover:border-primary transition-colors flex items-center justify-center">
+</button>
+<span class="text-sm font-medium">Finalize Q2 pitch deck</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-mono text-on-surface-variant">4/8</span>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-40 hover:opacity-100 cursor-pointer">drag_indicator</span>
+</div>
+</div>
+<!-- Task Item 2 (Completed) -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest transition-colors rounded-xl opacity-40">
+<div class="flex items-center gap-4">
+<button class="w-5 h-5 rounded bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px] text-on-primary font-bold">check</span>
+</button>
+<span class="text-sm font-medium line-through">Morning inbox zero</span>
+</div>
+<span class="text-[10px] font-mono">1/1</span>
+</div>
+<!-- Task Item 3 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors rounded-xl">
+<div class="flex items-center gap-4">
+<button class="w-5 h-5 rounded border border-outline-variant group-hover:border-primary transition-colors"></button>
+<span class="text-sm font-medium">Review architectural diagrams</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-mono text-on-surface-variant">0/2</span>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-40 hover:opacity-100 cursor-pointer">drag_indicator</span>
+</div>
+</div>
+<!-- Task Item 4 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors rounded-xl">
+<div class="flex items-center gap-4">
+<button class="w-5 h-5 rounded border border-outline-variant group-hover:border-primary transition-colors"></button>
+<span class="text-sm font-medium">Weekly 1:1 with Design Team</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-mono text-on-surface-variant">0/1</span>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-40 hover:opacity-100 cursor-pointer">drag_indicator</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Summary / Mini Stats Bento -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low/30 p-5 rounded-2xl border border-outline-variant/5">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Today's Output</p>
+<p class="text-2xl font-bold">4.2<span class="text-sm font-normal text-on-surface-variant ml-1">hrs</span></p>
+</div>
+<div class="bg-surface-container-low/30 p-5 rounded-2xl border border-outline-variant/5">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Focus Score</p>
+<p class="text-2xl font-bold text-primary">92%</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Shell -->
+<footer class="fixed bottom-0 w-full flex justify-between px-8 py-4 z-40 bg-[#131313]">
+<div class="flex items-center gap-6">
+<span class="text-[10px] uppercase tracking-widest font-mono text-[#E5E2E1]/40">Locked In Status: Ready</span>
+<div class="flex items-center gap-1.5 opacity-80">
+<span class="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+<span class="text-[10px] uppercase tracking-widest font-mono text-[#E5E2E1]/40">Focus Mode Active</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<span class="text-[10px] uppercase tracking-widest font-mono text-[#E5E2E1]/40">Local Time: 14:00</span>
+<div class="flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono text-primary/80">
+<span class="material-symbols-outlined text-[14px]">cloud_done</span>
+<span>PWA INSTALLED</span>
+</div>
+</div>
+</footer>
+</body></html>

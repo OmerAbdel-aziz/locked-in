@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Locked In - Deep Work Sanctuary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#3a3939",
+                    "on-primary-container": "#004b1e",
+                    "secondary-fixed": "#b2f2b7",
+                    "background": "#131313",
+                    "surface-tint": "#4ae176",
+                    "error-container": "#93000a",
+                    "inverse-on-surface": "#313030",
+                    "tertiary-fixed-dim": "#ffb4a9",
+                    "primary-fixed": "#6bff8f",
+                    "on-error": "#690005",
+                    "surface-container": "#201f1f",
+                    "surface": "#131313",
+                    "on-surface-variant": "#bccbb9",
+                    "on-surface": "#e5e2e1",
+                    "surface-container-highest": "#353534",
+                    "primary": "#4be277",
+                    "secondary-container": "#175428",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-background": "#e5e2e1",
+                    "surface-dim": "#131313",
+                    "on-secondary-fixed": "#002109",
+                    "on-tertiary-container": "#76231b",
+                    "tertiary-fixed": "#ffdad5",
+                    "secondary-fixed-dim": "#96d59d",
+                    "primary-fixed-dim": "#4ae176",
+                    "on-secondary-container": "#89c78f",
+                    "primary-container": "#22c55e",
+                    "error": "#ffb4ab",
+                    "on-primary-fixed-variant": "#005321",
+                    "secondary": "#96d59d",
+                    "on-primary-fixed": "#002109",
+                    "on-secondary": "#003915",
+                    "outline": "#869585",
+                    "tertiary-container": "#ff8b7c",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-variant": "#353534",
+                    "on-primary": "#003915",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-fixed": "#410001",
+                    "on-tertiary-fixed-variant": "#7f2a21",
+                    "on-tertiary": "#60130d",
+                    "on-error-container": "#ffdad6",
+                    "outline-variant": "#3d4a3d",
+                    "inverse-primary": "#006e2f",
+                    "inverse-surface": "#e5e2e1",
+                    "on-secondary-fixed-variant": "#145126",
+                    "tertiary": "#ffb5ab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"],
+                    "mono": ["JetBrains Mono"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+        }
+        .timer-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(53, 53, 52, 0.6);
+            backdrop-filter: blur(20px);
+        }
+        .custom-ring {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 450;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-[#131313] flex justify-between items-center px-8 h-16 w-full max-w-screen-2xl mx-auto z-50">
+<div class="text-xl font-bold tracking-tighter text-[#E5E2E1]">Locked In</div>
+<nav class="flex gap-8 items-center h-full">
+<button class="text-[#4BE277] border-b-2 border-[#4BE277] pb-1 font-bold h-full flex items-center transition-colors duration-200 ease-in-out">Focus</button>
+<button class="text-[#E5E2E1]/60 font-medium hover:text-[#E5E2E1] transition-colors duration-200 ease-in-out">Short Break</button>
+<button class="text-[#E5E2E1]/60 font-medium hover:text-[#E5E2E1] transition-colors duration-200 ease-in-out">Long Break</button>
+</nav>
+<div class="flex items-center gap-6">
+<div class="text-[#4BE277] bg-[#4BE277]/10 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+                Streak: 5
+            </div>
+<div class="flex items-center gap-3 text-[#E5E2E1]/60">
+<button class="hover:text-[#E5E2E1] transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<button class="hover:text-[#E5E2E1] transition-colors"><span class="material-symbols-outlined">account_circle</span></button>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center pt-16 px-6 pb-24">
+<!-- Main Timer Section -->
+<section class="w-full max-w-[640px] flex flex-col items-center">
+<!-- Timer Progress Ring -->
+<div class="relative w-80 h-80 flex items-center justify-center mb-12">
+<svg class="absolute inset-0 w-full h-full rotate-[-90deg]">
+<circle class="text-surface-container-highest opacity-20" cx="160" cy="160" fill="transparent" r="140" stroke="currentColor" stroke-width="8"></circle>
+<circle class="custom-ring" cx="160" cy="160" fill="transparent" r="140" stroke="url(#timer-gradient)" stroke-linecap="round" stroke-width="12"></circle>
+<defs>
+<lineargradient id="timer-gradient" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#4be277"></stop>
+<stop offset="100%" stop-color="#22c55e"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="flex flex-col items-center z-10">
+<span class="text-7xl font-bold timer-mono tracking-tight text-on-surface">24:58</span>
+<span class="bg-surface-container-highest text-primary text-[10px] font-bold tracking-[0.2em] uppercase px-3 py-1 mt-4 rounded-full">Session 3 of 4</span>
+</div>
+</div>
+<!-- Focus Controls -->
+<div class="grid grid-cols-3 gap-4 w-full max-w-[420px] mb-16">
+<button class="flex flex-col items-center gap-2 py-4 rounded-xl hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-surface-variant group-hover:text-on-surface">replay</span>
+<span class="text-[10px] uppercase tracking-widest font-bold text-surface-variant group-hover:text-on-surface">Reset</span>
+</button>
+<button class="flex items-center justify-center bg-primary text-on-primary py-4 rounded-xl shadow-2xl shadow-primary/20 hover:scale-95 transition-transform">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-4 rounded-xl hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-surface-variant group-hover:text-on-surface">skip_next</span>
+<span class="text-[10px] uppercase tracking-widest font-bold text-surface-variant group-hover:text-on-surface">Skip</span>
+</button>
+</div>
+<!-- Active Task Display -->
+<div class="w-full glass-panel p-6 rounded-2xl border-l-4 border-primary mb-16 flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<h2 class="text-lg font-bold tracking-tight">Finalize Q2 pitch deck</h2>
+</div>
+<span class="text-xs font-mono text-on-surface-variant">Session Progress</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-1/2 rounded-full"></div>
+</div>
+<div class="flex justify-between text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
+<span>4 Pomodoros Focused</span>
+<span>Goal: 8</span>
+</div>
+</div>
+<!-- Task List Section -->
+<div class="w-full flex flex-col gap-8">
+<div class="relative w-full">
+<input class="w-full bg-transparent border-0 border-b border-surface-container-highest py-3 px-0 focus:ring-0 focus:border-primary placeholder:text-surface-variant text-lg transition-colors" placeholder="Add new task..." type="text"/>
+<span class="absolute right-0 top-1/2 -translate-y-1/2 material-symbols-outlined text-surface-variant">add</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Task Item (Active) -->
+<div class="flex items-center gap-4 p-4 rounded-xl bg-surface-container-low border-l-2 border-primary">
+<span class="material-symbols-outlined text-surface-variant cursor-grab">drag_indicator</span>
+<div class="flex-grow">
+<h3 class="font-medium">Finalize Q2 pitch deck</h3>
+<div class="flex items-center gap-4 mt-2">
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="material-symbols-outlined text-[14px] text-surface-variant">eco</span>
+</div>
+<span class="w-1 h-1 rounded-full bg-surface-variant"></span>
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Project: Q2 Growth</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-6 h-6 rounded border-2 border-surface-container-highest flex items-center justify-center hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[16px] text-primary hidden">check</span>
+</button>
+</div>
+</div>
+<!-- Task Item 2 -->
+<div class="flex items-center gap-4 p-4 rounded-xl hover:bg-surface-container-low group transition-colors">
+<span class="material-symbols-outlined text-surface-variant/20 group-hover:text-surface-variant cursor-grab">drag_indicator</span>
+<div class="flex-grow">
+<h3 class="font-medium text-on-surface/80">Review marketing budget</h3>
+<div class="flex items-center gap-4 mt-1">
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-[14px] text-surface-variant">eco</span>
+<span class="material-symbols-outlined text-[14px] text-surface-variant">eco</span>
+</div>
+<span class="w-1 h-1 rounded-full bg-surface-variant"></span>
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Project: Marketing</span>
+</div>
+</div>
+<button class="w-6 h-6 rounded border-2 border-surface-container-highest flex items-center justify-center hover:border-primary transition-colors"></button>
+</div>
+<!-- Task Item 3 (Completed) -->
+<div class="flex items-center gap-4 p-4 rounded-xl opacity-40">
+<span class="material-symbols-outlined text-surface-variant/20 cursor-default">drag_indicator</span>
+<div class="flex-grow">
+<h3 class="font-medium line-through">Check email backlog</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] uppercase tracking-widest font-bold">Completed</span>
+</div>
+</div>
+<div class="w-6 h-6 rounded bg-primary/20 border-2 border-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+</div>
+</div>
+<!-- List Summary -->
+<div class="flex justify-between items-center py-6 px-4 bg-surface-container-low/30 rounded-2xl">
+<div class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
+                        Total today: <span class="text-on-surface">8 estimated</span> • <span class="text-primary">3 completed</span>
+</div>
+<button class="text-primary text-[10px] uppercase tracking-widest font-bold hover:underline">Clear Completed</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full flex justify-between px-8 py-4 z-40 bg-[#131313]">
+<div class="text-[10px] uppercase tracking-widest font-mono text-[#E5E2E1]/40 flex gap-6">
+<span>Locked In Status: Ready</span>
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Focus Mode Active</span>
+</div>
+<div class="text-[10px] uppercase tracking-widest font-mono text-[#E5E2E1]/40 flex gap-6">
+<span>Local Time: 14:00</span>
+<span>Connection: Offline</span>
+<span>App: v2.4.1</span>
+</div>
+</footer>
+<!-- Focus Shroud (Hidden state simulation) -->
+<div class="fixed inset-0 bg-background/80 backdrop-blur-sm pointer-events-none opacity-0 z-40"></div>
+</body></html>
