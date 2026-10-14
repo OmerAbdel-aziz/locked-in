@@ -39,12 +39,18 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 2: Port DESIGN.md tokens into Tailwind
 **Description:** Copy the full token set from `code.html`'s `tailwind.config` (colors, radius, fonts) into the real Tailwind config; add Inter + JetBrains Mono + Material Symbols via `next/font`; create base layer applying DESIGN.md rules (no pure white, body bg `#131313`, easing curve utility).
 **Acceptance:**
-- [ ] Every token in `code.html`'s config is available as a Tailwind utility (spot-check: `bg-surface-container-low`, `text-primary`)
-- [ ] A styled shell page matches the Stitch background/text colors (no `#FFFFFF` anywhere)
+- [x] Every token in `code.html`'s config is available as a Tailwind utility (spot-check: `bg-surface-container-low`, `text-primary`)
+- [x] A styled shell page matches the Stitch background/text colors (no `#FFFFFF` anywhere)
 **Verification:** Visual check of `/`; grep for `#fff`/`white` returns no product styles.
 **Dependencies:** Task 1
 **Files:** tailwind.config.ts, app/globals.css, app/layout.tsx
 **Scope:** S
+
+**Deviations (both deliberate):**
+1. **No `tailwind.config.ts`** — the scaffold installed Tailwind **v4**, which is CSS-first: tokens live in the `@theme` block in `app/globals.css` instead of a JS config. Same token set, v4 idiom. (`@config` could load a JS file, but that would fight the framework.)
+2. **Material Symbols not via `next/font`** — checked all **1942** fonts in Next 16's `font-data.json`; Material Symbols is not in the catalog (only `Noto Sans Symbols`). `code.html` loads it with a Google Fonts `<link>`, which `next/font` exists to avoid, and the unsubsetted icon font is multi-MB — wrong for a calm focus app. **Deferred to Task 7**, where icons are first used; recommendation then is inline SVG or a self-hosted subset, not an external `<link>`.
+
+**Acceptance hardening:** `tests/design-tokens.test.ts` (10 assertions) turns these criteria into a permanent gate — every one of the 47 tokens must appear in `@theme` at the exact hex, no undeclared `--color-*`, no pure-white *declaration* (comments exempt, since DESIGN.md prose legitimately quotes the value), plus the DESIGN.md rules (body `#131313`, root pinned against the white `canvastext` color, `cubic-bezier(0.4, 0, 0.2, 1)`, `cta-gradient`/`glass-panel`). Mutation-tested: breaking a hex, injecting `#ffffff`, and deleting a token each fail the suite.
 
 ### Task 3: Convex init + schema v1 with indexes
 **Description:** Initialize Convex, define schema: `identities`, `users`, `projects`, `tasks`, `sessions`, `settings` exactly per PRD §6, with indexes needed by stats (`sessions: by_owner_completed`, `tasks: by_owner_active`) and ordering (fractional `order` on tasks).
@@ -367,4 +373,5 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 | Phase −1 (design package) | done | Stitch package exported to `docs/design/` — DESIGN.md, code.html, screen.png, tokens.json (47 color tokens verified identical across all 4 screens and vs `namedColors`), reference variants. See `docs/design/README.md`. |
 | Phase −1 (layout decision) | done | **Two-column dashboard is canonical** (human, 2026-10-14) — ADR-004. `code.html`/`screen.png` swapped to the two-column screen; single-column discarded (Focus Shroud markup salvaged to `screens/focus-shroud-snippet.html`). PRD §1/§4.1 updated; Tasks 7, 10, 12, 18, 26 re-scoped. |
 | 1 | done | Next 16.4 + React 19.3 + TS 5.9 + Tailwind 4.3 + vitest 5.0 + Playwright 1.64. `dev/build/lint/test` all green; smoke test proves vitest wiring. `@types/node` bumped ^20→^24 (runtime is Node 24; vitest 5 requires ≥24). Dropped `vite-tsconfig-paths` — Vite resolves paths natively (49s→1.5s). |
-| 2–28 | not started | |
+| 2 | done | All 47 colors + radius + fonts ported into Tailwind **v4 `@theme`** in `app/globals.css` (no `tailwind.config.ts` — see deviation note). Inter + JetBrains Mono self-hosted via `next/font`; Material Symbols **deferred** (not in `next/font`'s 1942-font catalog; multi-MB external `<link>` — revisit at Task 7). Base layer enforces body `#131313` / text `#e5e2e1`, `ease-sanctuary`, `cta-gradient`, `glass-panel`. Verified by screenshot + computed styles (`bodyBg` `rgb(19,19,19)`, digits in JetBrains Mono, **zero** elements painted white) and locked in by `tests/design-tokens.test.ts`. |
+| 3–28 | not started | |
