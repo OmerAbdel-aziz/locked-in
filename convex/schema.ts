@@ -1,14 +1,27 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 /**
- * Convex schema v1 — Task 3.
+ * Convex schema v1 — Tasks 3 + 4.
  *
  * Field-for-field with PRD §6. Everything not listed here is deliberately
  * absent: streaks, leaf counts, daily totals and every other aggregate are
  * *derived* from `sessions` at read time and never stored (ADR-003).
  *
- * Indexes are named and shaped by the two requirements in this task:
+ * `...authTables` comes from Convex Auth and owns the six `auth*` system
+ * tables plus its own `users` shape. Our `users` below *replaces* the
+ * library's entry, because PRD §6 requires a `createdAt` the library doesn't
+ * define — so it carries the library's optional profile fields and its
+ * `email`/`phone` indexes (Task 23's magic link queries by email) alongside
+ * the column PRD asks for.
+ *
+ * Foreign keys use `v.id(...)`, not `string`, so they carry referential
+ * integrity and type as `Id<"table">` rather than degrading to `string` on
+ * read. Adopted while every table is still empty, so there is no data to
+ * migrate.
+ *
+ * Indexes are named and shaped by the two requirements in Task 3:
  *   - stats over an owner + completedAt range (bounded scans, never a
  *     full-log pull — see the PRD's "Stats page slow" mitigation)
  *   - listing an owner's active tasks in fractional `order`
@@ -18,26 +31,47 @@ import { v } from "convex/values";
  * `tzOffsetAtCompletion` is just a bounded `completedAt` range, so
  * `by_owner_completed` serves day derivations by converting the local
  * day's boundaries to UTC once and running one range scan. That keeps the
- * schema exactly as PRD §6 specifies instead of smuggling in a denormalized
- * `dayKey` field (which would be a schema change requiring sign-off).
+ * schema as PRD §6 specifies instead of smuggling in a denormalized
+ * `dayKey` field.
  */
 export default defineSchema({
-  /** Present only after an anonymous identity is linked to an account (ADR-002). */
-  users: defineTable({
-    email: v.string(),
-    createdAt: v.number(),
-  }),
+  ...authTables,
 
   /**
-   * The link table that makes two identity paths safe to merge: an anonymous
-   * identity (or raw deviceId) and the user it eventually belongs to.
-   * Every Convex function resolves its owner through this table (ADR-002).
+   * Replaces `authTables.users` (see header). `createdAt` is PRD §6's;
+   * the rest are the library's, all optional. `isAnonymous` is what the
+   * Anonymous provider writes on first visit (Task 4).
+   */
+  users: defineTable({
+    // PRD §6
+    createdAt: v.number(),
+    // Convex Auth profile fields
+    email: v.optional(v.string()),
+    isAnonymous: v.optional(v.boolean()),
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phoneVerificationTime: v.optional(v.number()),
+  })
+    // Required by Convex Auth's own queries; Task 23 magic link uses email.
+    // Convex appends _creationTime to every index automatically, so it is
+    // not spelled out here (matching every other index in this schema).
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
+
+  /**
+   * The link table that makes two identity paths safe to merge: an
+   * anonymous identity and the user it eventually belongs to.
+   * Every Convex function resolves its owner through this (ADR-002).
    */
   identities: defineTable({
-    anonymousId: v.optional(v.string()),
+    /** The anonymous Convex Auth user row (a `users` doc with isAnonymous). */
+    anonymousId: v.optional(v.id("users")),
+    /** Raw device marker from browser storage, when one exists. */
     deviceId: v.optional(v.string()),
     /** Set once the anonymous identity is linked to an account. */
-    userId: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
     /** Set when the merge runs — the moment anonymous data joined an account. */
     mergedAt: v.optional(v.number()),
   })
@@ -46,7 +80,7 @@ export default defineSchema({
 
   /** `archivedAt` hides a project without deleting it or rewriting history. */
   projects: defineTable({
-    ownerId: v.string(),
+    ownerId: v.id("users"),
     name: v.string(),
     archivedAt: v.optional(v.number()),
   })
@@ -55,10 +89,10 @@ export default defineSchema({
     .index("by_owner_name", ["ownerId", "name"]),
 
   tasks: defineTable({
-    ownerId: v.string(),
+    ownerId: v.id("users"),
     title: v.string(),
-    /** Snapshot target: points at a `projects` row. */
-    projectId: v.optional(v.string()),
+    /** Points at a `projects` row. */
+    projectId: v.optional(v.id("projects")),
     /** Pomodoro leaves, 0–8 (range enforced in the mutation, not the validator). */
     estimate: v.number(),
     /** Fractional rank — insert between neighbours, never renumber the list. */
@@ -82,12 +116,14 @@ export default defineSchema({
    * never rewrites recorded history.
    */
   sessions: defineTable({
-    ownerId: v.string(),
+    ownerId: v.id("users"),
     startedAt: v.number(),
     completedAt: v.number(),
     phase: v.union(v.literal("focus"), v.literal("short"), v.literal("long")),
-    taskId: v.optional(v.string()),
-    projectId: v.optional(v.string()),
+    /** Bound at start; immutable afterwards. */
+    taskId: v.optional(v.id("tasks")),
+    /** Snapshot at start — survives task/project changes. */
+    projectId: v.optional(v.id("projects")),
     /**
      * UTC offset (minutes) at completion. Day grouping uses this, not the
      * server's clock: a session ending 01:00 counts for *that* calendar day.
@@ -100,7 +136,7 @@ export default defineSchema({
 
   /** One row per owner, written lazily on first use. */
   settings: defineTable({
-    ownerId: v.string(),
+    ownerId: v.id("users"),
     focusMin: v.number(),
     shortMin: v.number(),
     longMin: v.number(),

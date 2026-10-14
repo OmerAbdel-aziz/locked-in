@@ -30,7 +30,21 @@ const s = schema as unknown as ConvexSchema;
 
 /** PRD §6 as literal data: table -> field -> required? */
 const PRD_6: Record<string, Record<string, boolean>> = {
-  users: { email: true, createdAt: true },
+  // `users` is the one table where the merged shape (Task 4) departs from
+  // PRD §6's two columns: Convex Auth owns the optional profile fields, and
+  // `email` must be optional because the Anonymous provider creates a user
+  // with no email at all. PRD §6's `createdAt` is the column the library
+  // does not provide, so it stays required.
+  users: {
+    createdAt: true,
+    email: false,
+    isAnonymous: false,
+    name: false,
+    image: false,
+    phone: false,
+    emailVerificationTime: false,
+    phoneVerificationTime: false,
+  },
   identities: {
     anonymousId: false,
     deviceId: false,
@@ -68,6 +82,20 @@ const PRD_6: Record<string, Record<string, boolean>> = {
   },
 };
 
+/**
+ * Convex Auth owns these via `authTables`. They are library system tables,
+ * not app domain entities — PRD §6 describes the domain, so they live in a
+ * separate list rather than being folded into PRD_6.
+ */
+const AUTH_TABLES = [
+  "authAccounts",
+  "authRateLimits",
+  "authRefreshTokens",
+  "authSessions",
+  "authVerificationCodes",
+  "authVerifiers",
+];
+
 const tables = Object.keys(PRD_6);
 
 function fieldsOf(table: string): Record<string, Validator> {
@@ -85,8 +113,20 @@ function indexOf(table: string, name: string): string[] | undefined {
 }
 
 describe("convex/schema vs PRD 6", () => {
-  it("defines exactly the six PRD tables, no more and no fewer", () => {
-    expect(Object.keys(s.tables).sort()).toEqual([...tables].sort());
+  it("defines the six PRD tables plus Convex Auth's system tables", () => {
+    expect(Object.keys(s.tables).sort()).toEqual(
+      [...tables, ...AUTH_TABLES].sort(),
+    );
+  });
+
+  it("keeps our users shape, not the library's", () => {
+    // `...authTables` ships a users table without createdAt; spreading it
+    // after our definition would silently drop PRD §6's column.
+    expect(fieldsOf("users").createdAt).toBeDefined();
+    expect(fieldsOf("users").isAnonymous).toBeDefined();
+    // Task 23's magic link queries users by email index.
+    expect(indexOf("users", "email")).toEqual(["email"]);
+    expect(indexOf("users", "phone")).toEqual(["phone"]);
   });
 
   it("matches every table field-for-field, including optionality", () => {
@@ -129,6 +169,31 @@ describe("convex/schema vs PRD 6", () => {
     expect(fieldsOf("tasks").estimate.kind).toBe("float64");
     // Fractional ordering requires a float, never an integer rank.
     expect(fieldsOf("tasks").order.kind).toBe("float64");
+  });
+
+  it("types foreign keys as real ids, not bare strings", () => {
+    // v.string() FKs carry no referential integrity and read back as
+    // `string` instead of `Id<"table">`. Adopted while tables were empty.
+    const ids: [string, string, string][] = [
+      ["tasks", "ownerId", "users"],
+      ["tasks", "projectId", "projects"],
+      ["sessions", "ownerId", "users"],
+      ["sessions", "taskId", "tasks"],
+      ["sessions", "projectId", "projects"],
+      ["projects", "ownerId", "users"],
+      ["settings", "ownerId", "users"],
+      ["identities", "anonymousId", "users"],
+      ["identities", "userId", "users"],
+    ];
+
+    for (const [table, field, target] of ids) {
+      const v = fieldsOf(table)[field] as unknown as {
+        kind: string;
+        tableName?: string;
+      };
+      expect(v.kind, `${table}.${field} should be an id`).toBe("id");
+      expect(v.tableName, `${table}.${field} target`).toBe(target);
+    }
   });
 
   it("restricts phase to focus | short | long", () => {
