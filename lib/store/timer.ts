@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import {
   DEFAULT_SETTINGS,
@@ -96,25 +96,47 @@ export const COUNTDOWN_TICK_MS = 250;
  * There is no accumulator here on purpose: the number is derived from the
  * wall clock each tick, which is what lets the app survive tab
  * backgrounding and device sleep (PRD §10.2).
+ *
+ * The clock is treated as an **external store we subscribe to**, rather than
+ * a value read during render. That is not a stylistic preference: this route
+ * is statically prerendered, and Next.js fails the build when a client
+ * component reads `Date.now()` while rendering — the value would be frozen
+ * at build time instead of recomputed per visit (`blocking-prerender-current-time`).
+ * `useSyncExternalStore` keeps the read out of render entirely: the server
+ * snapshot is a constant, so the prerendered HTML needs no clock at all.
+ *
+ * The snapshot is quantised to the tick so two reads within the same tick
+ * are identical. React treats a snapshot that changes between reads as an
+ * unstable store and re-renders until it settles, so a raw `Date.now()`
+ * here would spin. The cost is a `now` that trails reality by at most one
+ * tick — the same 250ms the face already refreshes on, and it can never
+ * surface as a wrong value because the readout rounds up to whole seconds.
  */
+export const SERVER_TICK = 0;
+
 export function useCountdown(): number {
   const state = useTimerStore((s) => s.state);
   const settings = useTimerStore((s) => s.settings);
-  // `now` lags by at most one tick after a phase transition. That is
-  // harmless: `remainingMs` clamps to [0, duration] and the face reads at
-  // mm:ss, so a sub-second lag can never surface as a wrong value.
-  const [now, setNow] = useState(() => Date.now());
 
-  useEffect(() => {
-    if (state.status !== "running") {
-      // Idle and paused need no ticks: idle reads the full duration and
-      // paused is frozen at `pausedAt`, neither of which depends on `now`.
-      return;
-    }
+  // Identity changes with `status`, so React re-subscribes on each phase
+  // transition. Idle and paused subscribe to nothing: idle reads the full
+  // duration and paused is frozen at `pausedAt`, so neither needs ticks.
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (state.status !== "running") {
+        return () => {};
+      }
+      const id = setInterval(onChange, COUNTDOWN_TICK_MS);
+      return () => clearInterval(id);
+    },
+    [state.status],
+  );
 
-    const id = setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS);
-    return () => clearInterval(id);
-  }, [state.status, state.phaseEndsAt]);
+  const tick = useSyncExternalStore(
+    subscribe,
+    () => Math.ceil(Date.now() / COUNTDOWN_TICK_MS),
+    () => SERVER_TICK,
+  );
 
-  return remainingMs(state, settings, now);
+  return remainingMs(state, settings, tick * COUNTDOWN_TICK_MS);
 }

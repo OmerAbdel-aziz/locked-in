@@ -1,4 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -315,4 +317,30 @@ describe("useCountdown is derived from the wall clock", () => {
     act(() => useTimerStore.getState().setSettings({ focusMin: 50 }));
     expect(result.current).toBe(50 * MIN);
   });
+
+  it("never consults the clock during a server render", () => {
+    // Regression gate for a real build failure found in Task 7. The focus
+    // route is statically prerendered, and Next.js 16 refuses to build when
+    // a client component reads `Date.now()` while rendering — the value
+    // would be frozen at build time instead of recomputed per visit
+    // (`blocking-prerender-current-time`). The countdown therefore
+    // subscribes to the clock as an external store, whose server snapshot is
+    // a constant.
+    //
+    // A running timer is the case that would need a clock. Ten minutes have
+    // elapsed, so 15 min would be the answer if the server consulted
+    // `Date.now()`; the server has no clock, so it reports the whole phase.
+    act(() => useTimerStore.getState().start());
+    vi.setSystemTime(T0 + 10 * MIN);
+
+    const html = renderToString(createElement(CountdownProbe));
+
+    expect(html).toContain(String(25 * MIN));
+    expect(html).not.toContain(String(15 * MIN));
+  });
 });
+
+/** Minimal client component that renders the live countdown. */
+function CountdownProbe() {
+  return createElement("span", null, String(useCountdown()));
+}
