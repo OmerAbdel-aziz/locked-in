@@ -340,6 +340,24 @@ export function skipPhase(
 }
 
 /**
+ * Re-clamp a state after the settings changed underneath it.
+ *
+ * Dropping `sessionCount` from 4 to 2 while sitting on session 3 would
+ * otherwise leave "Session 3 of 2" on screen. Normalising keeps the state
+ * coherent without pretending the change was a phase transition.
+ */
+export function normalizeState(
+  state: TimerState,
+  settings: TimerSettings,
+): TimerState {
+  const position = clampPosition(state.cyclePosition, settings);
+  if (position === state.cyclePosition) {
+    return state;
+  }
+  return { ...state, cyclePosition: position };
+}
+
+/**
  * Jump directly to a phase — the Focus / Short / Long tabs (Task 6).
  *
  * Choosing a phase by hand is not completion and not a skip, so it moves

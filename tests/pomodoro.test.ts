@@ -6,6 +6,7 @@ import {
   durationMs,
   initialTimerState,
   isPhaseComplete,
+  normalizeState,
   pauseTimer,
   remainingMs,
   resetTimer,
@@ -353,5 +354,27 @@ describe("selectPhase repositions without touching the cycle", () => {
   it("is a no-op for the phase already selected", () => {
     const running = runningFocus();
     expect(selectPhase(running, "focus", DEFAULT_SETTINGS)).toBe(running);
+  });
+});
+
+describe("normalizeState re-clamps after settings change", () => {
+  const at3: TimerState = {
+    phase: "focus", cyclePosition: 3, status: "idle", phaseEndsAt: null, pausedAt: null,
+  };
+
+  it("pulls a cycle position back inside a smaller session count", () => {
+    // Otherwise the UI would read "Session 3 of 2".
+    const next = normalizeState(at3, { ...DEFAULT_SETTINGS, sessionCount: 2 });
+    expect(next.cyclePosition).toBe(2);
+  });
+
+  it("leaves a valid position and the rest of the state untouched", () => {
+    const next = normalizeState(at3, DEFAULT_SETTINGS);
+    expect(next).toBe(at3);
+  });
+
+  it("recovers from a non-finite position", () => {
+    const broken: TimerState = { ...at3, cyclePosition: Number.NaN };
+    expect(normalizeState(broken, DEFAULT_SETTINGS).cyclePosition).toBe(1);
   });
 });
