@@ -18,7 +18,9 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 **Files:** docs/design/* (DESIGN.md, code.html, screen.png, tokens.json, README.md, screens/*)
 **Scope:** S
 
-**Note / open item:** The Stitch project contains **two different layouts**, not four states of one. The canonical single-column screen (`code.html`) matches the PRD; the "Paused (Desktop)" screen is a two-column dashboard with a `FOCUS SCORE 92%` metric that contradicts PRD §4.1 ("readout only — no reward state"). Logged in `docs/design/README.md`; flagged for human review before anything is built against it.
+**Decision (2026-10-14, human):** the Stitch project contains **two different layouts**, not four states of one. The **two-column dashboard** ("Paused (Desktop)") is canonical — better UX per the decider. The single-column layout is discarded; its Focus Shroud markup was salvaged to `docs/design/screens/focus-shroud-snippet.html` before removal. See [ADR-004](../docs/decisions/ADR-004-two-column-dashboard-layout.md).
+
+Four design/PRD divergences were resolved in favour of the PRD's *requirements* inside the design's *composition* — `Today's Output` / `Focus Score` map onto aggregations the PRD already requires (Focus Score = completion ratio, a passive readout, so §4.1's "no reward state" holds). Full table in `docs/design/README.md`.
 
 ---
 
@@ -90,11 +92,12 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 **Files:** lib/store/timer.ts, tests/timer-store.test.ts
 **Scope:** S
 
-### Task 7: Timer UI
-**Description:** Build the designed timer section: progress ring (SVG, gradient stroke, round caps), monospace digits, "Session N of M" pill, Start/Pause primary (gradient CTA), Reset + Skip ghost buttons, Focus/Short/Long top-nav tabs — per `code.html` structure and DESIGN.md.
+### Task 7: Timer UI (left column — Timer Engine)
+**Description:** Build the left "Timer Engine" column per the two-column composition in `code.html`: progress ring (SVG, gradient stroke, round caps), monospace digits, "Session N of M" pill, Start/Pause primary (gradient CTA), Reset + Skip ghost buttons, Focus/Short/Long top-nav tabs. Design tokens and layout from `code.html` + DESIGN.md.
 **Acceptance:**
-- [ ] Visually matches the Stitch screenshot (ring proportion, pill, control layout)
-- [ ] All controls drive the store; no local component state for phase
+- [ ] Visually matches `docs/design/screen.png` (ring proportion, pill, CTA, column placement)
+- [ ] Running state (Pause CTA, active ring) derived from the paused screen + DESIGN.md §5 — the design ships no running-state screen (ADR-004)
+- [ ] Reset + Skip present and working; the design's paused state shows only the Start CTA but PRD §4.1 requires all three controls
 **Verification:** Manual check against `docs/design/screen.png`; lint/build green.
 **Dependencies:** Task 2, Task 6
 **Files:** components/timer/*.tsx, app/page.tsx
@@ -127,10 +130,11 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 **Scope:** M
 
 ### Task 10: Task list UI
-**Description:** "Add new task…" inline input with project picker + leaf selector (0–8, default 2), task items (drag handle, title, leaves, project tag, checkbox), completed recede style, "Clear completed", per DESIGN.md no-line rules (tonal shifts + spacing only).
+**Description:** Right-column "Today's Focus" panel per the two-column composition: "Add new task…" inline input with project picker + leaf selector (0–8, default 2), task items (drag handle, title, leaves, project tag, checkbox), completed recede style, panel header count ("3 / 8 COMPLETED"), "Clear completed" beneath the list, per DESIGN.md no-line rules (tonal shifts + spacing only). Project tag renders inline in the row — required by PRD §4.1 though absent from the design (ADR-004).
 **Acceptance:**
 - [ ] Create/complete/reorder work against live Convex queries
 - [ ] No 1px divider borders used anywhere in the list (no-line rule)
+- [ ] Project tag shown inline; "Clear completed" present beneath the list (neither appears in the design — both PRD-required, ADR-004)
 **Verification:** Manual run-through vs. screenshot; lint.
 **Dependencies:** Task 9, Task 2
 **Files:** components/tasks/*.tsx, app/page.tsx
@@ -146,14 +150,15 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 **Files:** convex/sessions.ts, lib/store/timer.ts, components/tasks (selection), tests/binding.test.ts
 **Scope:** M
 
-### Task 12: Progress card + today footer
-**Description:** Active-task glass card (pulsing dot, title, progress bar, "N Pomodoros Focused / Goal: M", Session Progress label) and footer "Total today: N estimated • M completed" — both derived queries.
+### Task 12: Progress card + Summary bento
+**Description:** Active-task glass card in the **left column** (pulsing dot, title, progress bar, "N / M Pomodoros", "Currently Active" label) and the **Summary bento** in the right column beneath the task list (`Today's Output` = today's total focus work, `Focus Score` = completion ratio) — all derived queries.
 **Acceptance:**
 - [ ] Card shows active task's completed sessions vs. its estimate
-- [ ] Footer aggregates today's tasks (estimated) and today's completed tasks — matches design layout
+- [ ] Bento aggregates today's tasks (estimated) and today's completed work — matches design layout
+- [ ] Focus Score is a **passive readout**: no gate, no celebration, no threshold state, no color-coded pass/fail (PRD §4.1 "no reward state"; ADR-004)
 **Verification:** Manual vs. screenshot; aggregation unit test for "today" boundary.
 **Dependencies:** Task 11
-**Files:** components/tasks/progress-card.tsx, components/tasks/footer-summary.tsx, convex/tasks.ts (aggregates)
+**Files:** components/tasks/progress-card.tsx, components/tasks/summary-bento.tsx, convex/tasks.ts (aggregates)
 **Scope:** S
 
 **Checkpoint C:** full loop — add → activate → focus → progress updates live. Review with human.
@@ -225,10 +230,11 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 ## Phase 6: Focus Shroud
 
 ### Task 18: Focus Shroud overlay
-**Description:** Full-screen overlay (bg-background/80 + blur) dimming everything except timer digits + active task while focus runs; toggle control; enters/exits with the design's easing; keyboard-accessible.
+**Description:** Full-screen overlay (bg-background/80 + blur) dimming everything except timer digits + active task while focus runs; toggle control; enters/exits with the design's easing; keyboard-accessible. Implement from the salvaged markup in `docs/design/screens/focus-shroud-snippet.html` + DESIGN.md §5 — the canonical two-column screen has **no shroud equivalent**, so this is the only concrete reference (ADR-004).
 **Acceptance:**
 - [ ] Active during running focus only; auto-dismiss when focus phase ends
-- [ ] Timer + active task remain visible/interactive; nav, list, footer dimmed
+- [ ] Timer + active task remain visible/interactive; nav, both columns, footer dimmed
+- [ ] Salvaged snippet used as the base; no invented shroud styling
 **Verification:** Manual visual check; state test for show/hide conditions.
 **Dependencies:** Task 7, Task 11
 **Files:** components/shroud/focus-shroud.tsx, lib/store/timer.ts
@@ -321,10 +327,10 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 ## Phase 9: Polish & launch
 
 ### Task 26: Design review pass
-**Description:** Walk DESIGN.md Do/Don'ts + the Stitch screenshot against every shipped screen; fix drift; finish chrome: real local time in footer, honest connection status, remove any `#FFFFFF`/1px-divider regressions; copy the Stitch package into `docs/design/` as reference.
+**Description:** Walk DESIGN.md Do/Don'ts + the Stitch screenshot against every shipped screen; fix drift; finish chrome: replace the footer's decorative `PWA INSTALLED` / `v2.4.1` placeholders with real local time and honest connection status, remove any `#FFFFFF`/1px-divider regressions. `docs/design/` already holds the frozen package (Phase −1) — verify rather than re-copy.
 **Acceptance:**
 - [ ] Every DESIGN.md Do/Don't passes (checklist in PR description)
-- [ ] Footer shows real time + real connectivity (PRD assumption 4)
+- [ ] Footer shows real time + real connectivity; the design's `PWA INSTALLED` placeholder is gone (PRD assumption 4)
 **Verification:** Side-by-side vs. `docs/design/screen.png`; grep for forbidden styles.
 **Dependencies:** Tasks 10, 12, 15, 18, 20
 **Files:** various (fixups), docs/design/*
@@ -358,5 +364,6 @@ Reference: `docs/prd.md` (requirements), `tasks/plan.md` (architecture), `docs/d
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Phase −1 (design package) | done | Stitch package exported to `docs/design/` — DESIGN.md, code.html, screen.png, tokens.json (47 color tokens verified identical across all 4 screens and vs `namedColors`), 2 reference variants. See `docs/design/README.md`. |
+| Phase −1 (design package) | done | Stitch package exported to `docs/design/` — DESIGN.md, code.html, screen.png, tokens.json (47 color tokens verified identical across all 4 screens and vs `namedColors`), reference variants. See `docs/design/README.md`. |
+| Phase −1 (layout decision) | done | **Two-column dashboard is canonical** (human, 2026-10-14) — ADR-004. `code.html`/`screen.png` swapped to the two-column screen; single-column discarded (Focus Shroud markup salvaged to `screens/focus-shroud-snippet.html`). PRD §1/§4.1 updated; Tasks 7, 10, 12, 18, 26 re-scoped. |
 | 1–28 | not started | |

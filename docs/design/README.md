@@ -1,42 +1,72 @@
 # Locked In — Stitch Design Package
 
-Frozen reference copy of the Stitch design project that this app is built against.
-Everything in this directory is **reference material, not source**: the real app lives
-in `app/`, `components/`, and `lib/`. These files exist so Tasks 2, 7, 18, and 26 have
-a stable, offline copy to check against.
+Frozen reference copy of the Stitch design project this app is built against.
+Everything here is **reference material, not source**: the real app lives in `app/`,
+`components/`, and `lib/`. These files exist so Tasks 2, 7, 18, and 26 have a stable,
+offline copy to check against.
+
+## Canonical layout: two-column dashboard
+
+**Decision (2026-10-14, human):** the two-column dashboard is the canonical layout.
+Recorded in [ADR-004](../decisions/ADR-004-two-column-dashboard-layout.md).
+
+The earlier single-column composition that was briefly frozen here has been discarded.
+Its only unique asset — the Focus Shroud markup — was salvaged into
+`screens/focus-shroud-snippet.html` before removal.
 
 ## Provenance
 
 | | |
 |---|---|
 | Stitch project | **Locked In Dashboard UI** — `14098409106330604275` |
+| Canonical screen | *Locked In: Paused (Desktop)* — `617a18b476fc4f29974c4d8a43461277`, 2560×2048 |
 | Exported | 2026-10-14 |
 | Exported via | `stitch get project` / `stitch get screen` (CLI v0.11.1) |
-| Screens in project | 4 |
-
-The project is public and unchanged upstream; re-exporting will reproduce this package.
+| Screens in project | 4 (2 distinct compositions — see below) |
 
 ## Contents
 
 | File | What it is |
 |---|---|
 | `DESIGN.md` | The design system document ("The Digital Sanctuary"). Binding rules for the build. |
-| `code.html` | **Canonical screen** — *Locked In: Running (Desktop)*, 1280×1024. Self-contained: Tailwind CDN + `<script id="tailwind-config">` with the full token set, Inter + JetBrains Mono + Material Symbols. |
-| `screen.png` | Screenshot of the canonical screen. Used for visual diff in Tasks 7 and 26. |
-| `tokens.json` | The `tailwind.config.theme.extend` block extracted to JSON — colors, borderRadius, fontFamily — plus the DESIGN.md rules in machine-readable form. **This is the input for Task 2.** |
-| `screens/paused-desktop.{html,png}` | *Locked In: Paused (Desktop)*, 2560×2048. Reference only — see the discrepancy below. |
-| `screens/running-mobile.{html,png}` | *Locked In: Running (Mobile)*, 780×2542. Reference only. |
+| `code.html` | **Canonical screen** — the two-column dashboard. Self-contained: Tailwind CDN + `<script id="tailwind-config">` carrying the full token set, Inter + JetBrains Mono + Material Symbols. |
+| `screen.png` | Screenshot of the canonical screen. Visual diff target for Tasks 7 and 26. |
+| `tokens.json` | The `tailwind.config.theme.extend` block extracted to JSON — colors, borderRadius, fontFamily — plus the DESIGN.md rules. **Input for Task 2.** |
+| `screens/running-mobile.{html,png}` | *Locked In: Running (Mobile)*, 780×2542. Responsive reference. |
+| `screens/focus-shroud-snippet.html` | The Focus Shroud overlay markup, salvaged from the discarded layout. **Input for Task 18.** |
 
-The second *Running (Desktop)* screen (2560×2722, id `faadb360…`) is byte-identical in
-HTML to `code.html`; only its canvas size and screenshot differ, so it is not duplicated
-here. `screen.png` is taken from that screen because the 1280×1024 instance has no
-screenshot in the Stitch project.
+## The two-column composition
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Locked In    Focus · Short Break · Long Break    Streak: 5   │  TopNavBar
+├───────────────────────────┬──────────────────────────────────┤
+│  (timer ring)             │  Today's Focus        3/8 DONE   │
+│  Session 3 of 4           │  ┌ Add new task...           ┐   │
+│  25:00                    │  │ ✓ Finalize Q2 pitch deck 4/8│  │
+│                           │  │ ✓ Morning inbox zero    1/1│  │
+│  [ Start Focus Session ]  │  │   Review arch diagrams 0/2│  │  Right column:
+│  ◐ Currently Active       │  │   Weekly 1:1 Design     0/1│  │  Editorial Bento
+│  Finalize Q2 pitch deck   │  └───────────────────────────┘   │
+│  Progress  4/8 Pomodoros  │  TODAY'S OUTPUT   FOCUS SCORE    │
+│  ▓▓▓▓▓▓░░░░░░             │  4.2 hrs           92%           │
+├───────────────────────────┴──────────────────────────────────┤
+│ Locked In Status: Ready        Local Time: 14:00             │  Footer
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **Left — Timer Engine:** progress ring, `Session N of M` pill, monospace digits,
+  primary CTA, active-task card (glassmorphism, pulsing dot, progress bar).
+- **Right — Task Management:** "Today's Focus" list with inline add input, per-task
+  leaf counts, drag handles, completed styling; then a **Summary bento**.
+- **Footer:** status + real local time. See "decorative chrome" below.
 
 ## Token set — verified
 
-All four exported screens carry an **identical 47-color token set**, and that set matches
-the project's `designTheme.namedColors` exactly — no mismatches, no missing keys. Task 2
-therefore has one unambiguous source of truth.
+All four exported screens carry an **identical 47-color token set**, matching the
+project's `designTheme.namedColors` exactly — no missing keys, no value mismatches.
+The tokens are layout-independent, so the set is valid regardless of which composition
+is canonical. Task 2 has one unambiguous source of truth.
 
 Spot-checks (per `tasks/todo.md` Task 2 acceptance):
 
@@ -49,33 +79,22 @@ Spot-checks (per `tasks/todo.md` Task 2 acceptance):
 Non-color tokens: `borderRadius` (`DEFAULT 0.25rem`, `lg 0.5rem`, `xl 0.75rem`,
 `full 9999px`) and `fontFamily` (`headline/body/label: Inter`, `mono: JetBrains Mono`).
 
-## ⚠️ Discrepancy: two different layouts
+## Where the design is silent or conflicts with the PRD
 
-The four screens are **not** four states of one layout. They are two unrelated
-compositions:
+The PRD is the product spec; the design is the visual spec. Four places they diverge.
+All resolved in favour of keeping the PRD's *requirements* while adopting the design's
+*composition* — see ADR-004 for each.
 
-**A. `code.html` — single column.** Timer ring → controls → active-task card → task
-list → footer. This matches the PRD exactly (§4.1 Timer, Tasks, Session progress, the
-`Total today: N estimated • M completed` footer, and a hidden *Focus Shroud* state that
-Task 18 can crib from). **This is the canonical layout.**
-
-**B. `screens/paused-desktop.html` — two column.** A "Timer Engine" column beside a
-"Today's Focus" panel, plus a "Summary / Mini Stats Bento" showing **`TODAY'S OUTPUT
-4.2 HRS`** and **`FOCUS SCORE 92%`**.
-
-Screen B conflicts with the PRD in two places:
-
-1. The PRD specifies a single-screen app (§1), not a two-column dashboard.
-2. "Focus score" is a judgment metric. The PRD calls trends "insight without judgment"
-   (§4.1) and states the goal is "a **readout only** — no celebration gate, no reward
-   state in MVP" (§4.1 Session progress).
-
-Treat B as exploratory. **Follow A.** If B was meant to supersede A, that is a PRD
-change and needs a human decision before any code is written against it.
+| Gap | Resolution |
+|---|---|
+| **Focus Score / Today's Output** | Both map onto aggregations the PRD already requires. Output = today's total focus time (replaces the single-column footer's `Total today:` aggregate). Focus Score = completion ratio (completed ÷ estimated leaves), which PRD §4.1 already mandates on `/stats`. Surfaced on the home screen as a **passive readout** — no gate, no celebration — preserving §4.1's "no reward state". |
+| **No project tags** | The design's task rows carry no project tag, but PRD §4.1 requires optional project assignment + picker + filter. Render the tag inline in the row. Design is simply silent here. |
+| **No "Clear completed"** | Required by PRD §4.1 as a bulk action. The design omits it. Place it beneath the task list. |
+| **Footer "PWA INSTALLED"** | Decorative chrome. PRD assumption 1 puts PWA out of scope and assumption 4 requires *real* local time + *real* connection status. Task 26 replaces it. |
 
 ## Rules that constrain the build
 
-Pulled from `DESIGN.md` §2–§6; these are binding, not advisory (PRD §5):
+From `DESIGN.md` §2–§6; binding, not advisory (PRD §5):
 
 - **No pure white.** Text is `on-surface` `#e5e2e1`.
 - **No-line rule.** No 1px solid borders for sectioning — tonal shifts and whitespace
@@ -86,13 +105,15 @@ Pulled from `DESIGN.md` §2–§6; these are binding, not advisory (PRD §5):
 - **Ambient shadow:** `0 20px 50px -12px rgba(0,0,0,0.5)`.
 - **Easing:** all transitions `cubic-bezier(0.4, 0, 0.2, 1)`.
 - **Errors:** use `tertiary` (muted coral), never alert-red panic styling.
+- **Editorial bento:** the right column is a tonal/whitespace composition, not a card
+  grid — respect the no-line rule when building it.
 
 ## Re-exporting
 
 ```
 stitch get project 14098409106330604275 --json          # designTheme.designMd
 stitch find screens --project 14098409106330604275 --json
-stitch get screen <screen-id> --project 14098409106330604275 --json
+stitch get screen 617a18b476fc4f29974c4d8a43461277 --project 14098409106330604275 --json
 ```
 
 `htmlCode` and `screenshot` are returned as signed download URLs, not inline — fetch

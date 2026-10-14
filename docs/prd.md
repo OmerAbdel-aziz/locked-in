@@ -2,8 +2,8 @@
 
 **Status:** Draft (pending human review)
 **Date:** 2026-10-14
-**Source material:** Stitch design package (`DESIGN.md`, `screen.png`, `code.html`)
-**Related:** [ADR-001](decisions/ADR-001-nextjs-convex-stack.md), [ADR-002](decisions/ADR-002-anonymous-first-auth.md), [ADR-003](decisions/ADR-003-session-log-canonical.md)
+**Source material:** Stitch design package (`DESIGN.md`, `screen.png`, `code.html`) — frozen in [`docs/design/`](design/README.md)
+**Related:** [ADR-001](decisions/ADR-001-nextjs-convex-stack.md), [ADR-002](decisions/ADR-002-anonymous-first-auth.md), [ADR-003](decisions/ADR-003-session-log-canonical.md), [ADR-004](decisions/ADR-004-two-column-dashboard-layout.md)
 
 ---
 
@@ -11,7 +11,7 @@
 
 Locked In is a personal pomodoro focus app that feels like "a high-end, quiet library — low-sensory, high-intent, profoundly calm" (DESIGN.md, Creative North Star: *The Digital Sanctuary*).
 
-**The product in one sentence:** A single-screen web app where you pick a task, run focus sessions against it, watch progress accumulate as leaves, and keep an honest daily streak.
+**The product in one sentence:** A two-column web dashboard — a timer engine beside a task panel — where you pick a task, run focus sessions against it, watch progress accumulate as leaves, and keep an honest daily streak.
 
 **Who it's for:** Individual knowledge workers/students who want a calm pomodoro tool. Single-user per account; no teams, no sharing.
 
@@ -39,7 +39,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 1. Web app only (no native mobile); installable/PWA behavior is out of MVP scope.
 2. ~~"Project" is a plain optional string tag on a task~~ **Revised:** projects are a first-class entity with CRUD (see §4.1).
 3. Design fidelity follows `DESIGN.md` tokens exactly (`#131313`, `#4BE277`, no pure white, no 1px divider lines).
-4. The `v2.4.1` version/uptime footer chrome is decorative; MVP shows real local time + real connection status only.
+4. The footer's `v2.4.1` version/uptime and `PWA INSTALLED` chrome are decorative; MVP shows real local time + real connection status only (the two-column design's footer placeholders are replaced in Task 26).
 5. English-only MVP.
 
 ## 4. MVP scope
@@ -56,17 +56,29 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 - Browser Notification fired on phase end; permission requested on first Start press, never on page load. Settings toggle to disable.
 - Timer runs entirely in Zustand client state; app is otherwise online-only.
 
+**Layout** (revised 2026-10-14, see [ADR-004](decisions/ADR-004-two-column-dashboard-layout.md))
+- **Two-column dashboard** is canonical: a **Timer Engine** column (left) beside an **Editorial Bento** task panel (right), over a status footer. The earlier single-column composition is discarded.
+- Left column: progress ring, `Session N of M` pill, monospace digits, primary CTA, active-task card (glassmorphism).
+- Right column: "Today's Focus" list with inline add input, per-task leaf counts, drag handles; then a **Summary bento**.
+- Where the design and this PRD diverge, PRD functional requirements win and are expressed inside the two-column composition (ADR-004 §Consequences).
+
 **Tasks**
 - Create via inline "Add new task…" input; **project assignment (optional, from the projects picker)**; pomodoro estimate (leaf selector, 0–8, default 2).
 - Reorder via drag handle (as designed).
 - Complete/uncomplete via checkbox; completed tasks recede (opacity + strikethrough) per DESIGN.md.
-- "Clear completed" bulk action.
-- Footer aggregate: `Total today: N estimated • M completed`.
+- "Clear completed" bulk action — *not shown in the design; place beneath the task list (ADR-004).*
+- Project tag rendered inline in the task row — *the design shows no tag; required here (ADR-004).*
+- Summary bento: `Today's Output` (today's total focus time) and `Focus Score`.
 - **Active task:** clicking a task selects it (pulsing dot + green left-border); `activeTaskId` persisted; it receives all sessions started while active.
 
 **Session progress**
-- Active-task card: leaves completed vs. that task's estimate ("4 Pomodoros Focused / Goal: 8"), progress bar.
+- Active-task card (left column): leaves completed vs. that task's estimate ("4 / 8 Pomodoros"), progress bar.
 - Goal is a **readout only** — no celebration gate, no reward state in MVP.
+
+**Summary bento** (right column, below the task list)
+- `Today's Output`: today's total focus work, estimated vs. completed.
+- `Focus Score`: **completion ratio** — completed leaves ÷ estimated leaves. Same metric as `/stats`'s completion ratio (§4.1), surfaced on the home screen (ADR-004).
+- Both are **passive readouts**: no gate, no celebration, no threshold state, no color-coded pass/fail.
 
 **Streak**
 - Badge in header ("Streak: 5").
@@ -74,6 +86,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 
 **Focus Shroud**
 - Full-screen overlay that dims everything except the timer and active task while a focus session is running; dismissible per DESIGN.md ("Focus Shroud" component).
+- The canonical two-column screen has **no shroud equivalent**; implement from the salvaged markup in `docs/design/screens/focus-shroud-snippet.html` + DESIGN.md §5 (ADR-004). Task 18 has no other source.
 
 **Settings** (modal, shadcn dialog)
 - Focus/short/long durations, session count N.

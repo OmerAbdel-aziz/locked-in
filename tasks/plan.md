@@ -28,7 +28,7 @@ Convex schema + anonymous identity
     │                                                       │
     ├── Tasks CRUD ──► task list UI ──► active task binding ◄┘
     │        │               │
-    │        └── aggregates (footer, progress card)
+    │        └── aggregates (summary bento, progress card)
     │
     ├── Projects CRUD ──► picker/filter ──► project overview
     │
@@ -64,7 +64,7 @@ Convex schema + anonymous identity
 - Task 9: Task CRUD Convex functions + ordering
 - Task 10: Task list UI (add, checkbox, drag reorder, leaves, project tag, active selection)
 - Task 11: Active-task ↔ session binding (leaf increments)
-- Task 12: Active-task progress card + today footer aggregates
+- Task 12: Active-task progress card + Today's Output / Focus Score summary bento
 
 **Checkpoint C:** full loop works — add task → set active → run session → leaves/progress update live. *Human review.*
 
@@ -119,7 +119,7 @@ Convex schema + anonymous identity
 | Timer drift / wrong cycle rules | High | Pure engine + tests first (Task 5); drift encoded in unit tests |
 | Stats queries slow / client-scan logs | Med | Range-bounded indexes on `completedAt` defined in Task 3, verified in Task 19 |
 | Design drift from Stitch package | Med | Tokens ported once (Task 2); checklist gate in Task 26 |
-| Stitch package has two conflicting layouts | Med | Canonical single-column screen in `docs/design/code.html` follows the PRD; the "Paused (Desktop)" two-column variant (with a `FOCUS SCORE` metric) contradicts PRD §4.1 and is reference-only. Confirm at Checkpoint A before Task 7. |
+| Two-column layout has no running-state screen and no Focus Shroud | Med | Canonical `docs/design/code.html` is captured paused; Task 7 derives the running state from DESIGN.md §5. Focus Shroud markup salvaged to `docs/design/screens/focus-shroud-snippet.html` for Task 18. ADR-004. |
 | Hosting free-tier surprise | Low | Task 28 verifies before launch; nothing blocks earlier phases |
 
 ## Open Questions
