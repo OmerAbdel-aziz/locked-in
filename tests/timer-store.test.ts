@@ -92,6 +92,7 @@ describe("actions hand every transition to the engine", () => {
       status: "running",
       phaseEndsAt: T0 + 25 * MIN,
       pausedAt: null,
+      startedAt: T0,
     });
   });
 
@@ -124,7 +125,7 @@ describe("actions hand every transition to the engine", () => {
     useTimerStore.setState({
       state: {
         phase: "focus", cyclePosition: 4, status: "running",
-        phaseEndsAt: T0, pausedAt: null,
+        phaseEndsAt: T0, pausedAt: null, startedAt: T0,
       },
     });
 
@@ -139,7 +140,7 @@ describe("actions hand every transition to the engine", () => {
     useTimerStore.setState({
       state: {
         phase: "focus", cyclePosition: 3, status: "running",
-        phaseEndsAt: T0, pausedAt: null,
+        phaseEndsAt: T0, pausedAt: null, startedAt: T0,
       },
     });
 
@@ -154,7 +155,7 @@ describe("actions hand every transition to the engine", () => {
     useTimerStore.setState({
       state: {
         phase: "focus", cyclePosition: 3, status: "running",
-        phaseEndsAt: T0, pausedAt: null,
+        phaseEndsAt: T0, pausedAt: null, startedAt: T0,
       },
     });
 
@@ -170,7 +171,7 @@ describe("actions hand every transition to the engine", () => {
     useTimerStore.setState({
       state: {
         phase: "focus", cyclePosition: 3, status: "idle",
-        phaseEndsAt: null, pausedAt: null,
+        phaseEndsAt: null, pausedAt: null, startedAt: null,
       },
     });
 

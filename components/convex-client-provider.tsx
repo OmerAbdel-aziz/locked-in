@@ -4,6 +4,8 @@ import { ConvexAuthProvider, useAuthActions, useConvexAuth } from "@convex-dev/a
 import { ConvexReactClient } from "convex/react";
 import { useEffect, type ReactNode } from "react";
 
+import { SessionLogger } from "@/components/session-logger";
+
 /**
  * Client-side Convex wiring — Task 4.
  *
@@ -58,6 +60,10 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <ConvexAuthProvider client={convex}>
       <AnonymousIdentity />
+      {/* A sibling of the identity, not a child of any page: both are
+          conditions the app starts with, and a completed session must find
+          a writer no matter which route was showing. */}
+      <SessionLogger />
       {children}
     </ConvexAuthProvider>
   );

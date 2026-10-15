@@ -16,7 +16,7 @@ import {
   durationMs,
   type TimerStatus,
 } from "@/lib/pomodoro";
-import { useCountdown, useTimerStore } from "@/lib/store/timer";
+import { useCountdown, usePhaseCompletion, useTimerStore } from "@/lib/store/timer";
 
 import { ProgressRing, type RingVariant } from "./progress-ring";
 import { TimerControls } from "./timer-controls";
@@ -38,6 +38,10 @@ export function TimerEngine() {
   const reset = useTimerStore((s) => s.reset);
   const skip = useTimerStore((s) => s.skip);
   const remaining = useCountdown();
+  // Watches the same `remaining` this component renders with, so the
+  // moment the face reaches zero is the moment the phase is finished and
+  // logged — no second clock, no second source of truth (Task 8).
+  usePhaseCompletion(remaining);
 
   const total = durationMs(state.phase, settings);
   const progress = total > 0 ? 1 - remaining / total : 0;

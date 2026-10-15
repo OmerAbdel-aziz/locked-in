@@ -68,6 +68,29 @@ export interface TimerState {
   phaseEndsAt: number | null;
   /** Wall-clock ms the timer was paused at. Null unless paused. */
   pausedAt: number | null;
+  /**
+   * When this phase's own clock began — the `startedAt` written to the
+   * session log. Null while idle.
+   *
+   * **It is not the moment the user pressed Start.** Time spent paused is
+   * shifted out of it on resume, so `completedAt - startedAt` is always
+   * exactly the focus time actually accumulated. That product is what every
+   * time-based number in the stats surface sums (PRD §4.1: focus time,
+   * per-project breakdown, top tasks, and the history list's "duration"),
+   * and `sessions` is append-only (ADR-003) — a row whose span silently
+   * included a pause could never be corrected, since CSV import is the only
+   * repair path.
+   *
+   * The cost is that time-of-day bucketing (PRD §4.1 derives hours from
+   * `startedAt`) shifts forward by the accumulated pause for sessions that
+   * were actually paused. Unpaused sessions — the overwhelming majority —
+   * record the literal Start instant.
+   *
+   * Derived from `phaseEndsAt` would have been the alternative, and it is
+   * wrong twice over: a resume rewrites `phaseEndsAt`, and a mid-session
+   * settings change rewrites `durationMs` without touching it.
+   */
+  startedAt: number | null;
 }
 
 /** Duration of a phase in ms, from the user's settings. */
@@ -108,6 +131,7 @@ export function initialTimerState(): TimerState {
     status: "idle",
     phaseEndsAt: null,
     pausedAt: null,
+    startedAt: null,
   };
 }
 
@@ -224,6 +248,7 @@ function enterPhase(
       status: "idle",
       phaseEndsAt: null,
       pausedAt: null,
+      startedAt: null,
     };
   }
 
@@ -233,6 +258,8 @@ function enterPhase(
     status: "running",
     phaseEndsAt: now + durationMs(next.phase, settings),
     pausedAt: null,
+    // A phase that begins on its own starts its clock right here.
+    startedAt: now,
   };
 }
 
@@ -251,10 +278,18 @@ export function startPhase(
     status: "running",
     phaseEndsAt: now + durationMs(state.phase, settings),
     pausedAt: null,
+    // The session's clock starts at the moment the user started it.
+    startedAt: now,
   };
 }
 
-/** Freeze the phase at its current remaining time. No-op when not running. */
+/** Freeze the phase at its current remaining time. No-op when not running.
+ *
+ * `startedAt` is deliberately left alone: pausing is an interruption, not
+ * the beginning of a different session. The shift that keeps
+ * `completedAt - startedAt` equal to focus time happens on the way back in,
+ * where the length of the pause is known.
+ */
 export function pauseTimer(state: TimerState, now: number): TimerState {
   if (state.status !== "running") {
     return state;
@@ -281,11 +316,22 @@ export function resumeTimer(
   if (state.status !== "paused") {
     return state;
   }
+
+  // Slide `startedAt` forward by exactly the pause, so the session's span
+  // still measures focus time and nothing else (see `TimerState.startedAt`).
+  // If either instant is missing the shift cannot be computed, and leaving
+  // `startedAt` where it was is the safe side: it stays a real instant.
+  const pausedFor =
+    state.startedAt === null || state.pausedAt === null
+      ? 0
+      : now - state.pausedAt;
+
   return {
     ...state,
     status: "running",
     phaseEndsAt: now + remainingMs(state, settings, now),
     pausedAt: null,
+    startedAt: state.startedAt === null ? null : state.startedAt + pausedFor,
   };
 }
 
@@ -302,6 +348,7 @@ export function resetTimer(state: TimerState): TimerState {
     status: "idle",
     phaseEndsAt: null,
     pausedAt: null,
+    startedAt: null,
   };
 }
 
@@ -377,5 +424,8 @@ export function selectPhase(
     status: "idle",
     phaseEndsAt: null,
     pausedAt: null,
+    // Picking a phase abandons whatever was running — there is no session
+    // to log and no clock left running behind it.
+    startedAt: null,
   };
 }

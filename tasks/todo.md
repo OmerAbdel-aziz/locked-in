@@ -135,12 +135,64 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 8: Session completion → session log write
 **Description:** On focus phase completion (timer hits 0, not manually reset), write a `sessions` row: owner, startedAt, completedAt, phase, tzOffsetAtCompletion (and taskId/projectId as null for now — binding lands in Task 11); then transition per auto-start rules.
 **Acceptance:**
-- [ ] Completing a focus session (real 0s or test-injected short duration) creates exactly one session row
-- [ ] Manual Reset/Skip of a running focus session creates NO session row
+- [x] Completing a focus session (real 0s or test-injected short duration) creates exactly one session row
+- [x] Manual Reset/Skip of a running focus session creates NO session row
 **Verification:** Integration test on the Convex mutation; manual with 0:05 durations.
 **Dependencies:** Task 3, Task 4, Task 6
 **Files:** convex/sessions.ts, lib/store/timer.ts (completion hook), tests/sessions.test.ts
 **Scope:** S
+
+**Deviations (all deliberate, all reversible):**
+
+1. **`startedAt` needed new engine state, so `lib/pomodoro.ts` changed** — not in the
+   task's file list. It could not be avoided: `phaseEndsAt - duration` is wrong twice
+   over, because a resume rewrites `phaseEndsAt` and a mid-session settings change
+   rewrites `durationMs` without touching it. `TimerState` now carries
+   `startedAt: number | null`, stamped by `startPhase`/`enterPhase`, cleared by
+   `reset`/`selectPhase`, and **shifted forward by the pause on resume**.
+
+2. **`startedAt` is pause-adjusted, not the instant Start was pressed.** The PRD
+   names the field and never defines it under a pause. Example: Start 09:50, pause
+   09:55, resume 10:10, finishes 10:30 — this records `startedAt = 10:05`.
+   *Why:* `sessions` is append-only (ADR-003) and CSV import is its only repair
+   path, so `completedAt - startedAt` must equal focus time **forever**; recording
+   the raw Start instant would permanently inflate focus time, per-project
+   breakdown, top tasks, and every history "duration" by the paused time.
+   *Cost:* time-of-day bucketing (PRD §4.1) shifts forward by the accumulated
+   pause, but only for sessions that were actually paused. **Flagged as an
+   assumption** — the alternative is a `focusMs` column, which would be a §9
+   ask-first schema change. Overturn before any row is recorded in anger.
+
+3. **All three phases are logged, not only focus.** The task says "on focus phase
+   completion", but §4.1 requires a *break-vs-focus split* derived from the log and
+   no later task adds break logging — skipping it would make that metric
+   permanently unbuildable. The row's `phase` field is listed by the task itself and
+   the schema's union is `focus|short|long`. Reset/Skip still write nothing for any
+   phase, so both acceptance criteria are unaffected.
+
+4. **`taskId`/`projectId` are not accepted by the mutation at all**, despite the
+   task saying "as null". Accepting an id whose ownership has not been checked
+   would hand Task 11 an authorization hole. The schema types them optional, so an
+   unbound session is simply a row without them; Task 11 adds the arguments together
+   with the check.
+
+5. **Server-side idempotency** — a second write of the same `(startedAt,
+   completedAt, phase)` under the same owner returns the existing id instead of
+   appending. The client guard already makes a duplicate impossible in one tab;
+   this covers what that guard cannot see (a replayed message, two tabs running one
+   session). One indexed read against `by_owner_completed`, because a duplicate row
+   would corrupt every derived number permanently.
+
+6. **Completion lives in `complete()`, not only in the guarded wrapper** — so there
+   is exactly one place a session row can be produced and no future caller of
+   `complete()` can forget to log what it finished. `completeIfDue()` is the
+   guarded entry point the countdown uses.
+
+7. **`convex-test` runs in `jsdom`, not `edge-runtime`**, though `@edge-runtime/vm`
+   is already installed. The Convex guidelines recommend the edge runtime, but this
+   file also renders React hooks (which need a DOM) and the repo's established
+   `convex-test` pattern (`tests/owner.test.ts`) is jsdom. Splitting the file to
+   honour an environment preference would trade a real separation for nothing.
 
 **Checkpoint B:** timer runs, survives backgrounding, session rows appear. Review with human.
 
@@ -403,4 +455,5 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 | 5 | done | `lib/pomodoro.ts` — pure engine, injected `now`, **no `Date.now()` and no decrementing counter anywhere**; remaining is always `phaseEndsAt - now`. Cycle position = "the focus session that starts next" (1..N); completing focus N grants the long break and resets to 1 in the same step. Complete-vs-skip is a single `counted` flag through one code path, so the two cannot drift: **skip passes `false` and can therefore never grant an early long break**. Auto-start policy applied uniformly in one `enterPhase`, so skipping and completing transition identically. Added `selectPhase` for Task 6's mode tabs so the store has no transition logic of its own. `remainingMs` clamped to `[0, duration]` - a backwards clock jump cannot stretch a phase. Reset keeps phase + cycle position (real progress lives in the session log, ADR-003). **Defaults pinned by test** - §9 makes changing timer transition defaults an ask-first item, so 25/5/15/4 and auto-start break ON / focus OFF are asserted, not assumed. 37 tests, mutation-tested x8 (every mutation broke). |
 | 6 | done | `lib/store/timer.ts` — Zustand store that **holds state and nothing else**: every action is a one-line call into the engine. Enforced by an **equivalence test** that replays identical timed action sequences through the pure functions and through the store and requires identical states, so a rule cannot quietly live in two places. `useCountdown` re-derives from `phaseEndsAt - now` on a 250ms **display cadence** (documented as such - tick rate cannot affect correctness, which is what makes the background-tab case safe). `normalizeState` added to the *engine* so shrinking `sessionCount` cannot print "Session 3 of 2". Lint `react-hooks/set-state-in-effect` fired on an effect-body `setState`; rather than suppress it, the snap was removed - `remainingMs` already clamps to `[0, duration]` and the face reads mm:ss, so a sub-second stale clock cannot surface. Mutation-tested x6 (incl. "skip delegates to completePhase", caught by the equivalence gate). **Installed `zustand` 5.0.15** - see deviations; PRD §7/D6 specify it but it was missing from the scaffold, raised rather than assumed. Lint/`tsc`/build/95 tests green. |
 | 7 | done | `components/timer/*` + `app/page.tsx` - the left column is live: SVG progress ring, monospace readout, "Session N of M" pill, gradient CTA, ghost Reset/Skip, and Focus/Short/Long tabs wired to `setPhase`. **Ring geometry is taken from `code.html` literally** (viewBox 448 = the `max-w-md` container, `r` 48%, `stroke-width` 4, `-rotate-90`) so the 4px stroke renders at the size the design specifies and scales proportionally. DESIGN.md §5 honoured: track at 10% opacity, `round` caps, progress as the `primary` gradient - never a flat fill. **Running state derived per ADR-004**: idle keeps the design's full muted circle (the whole session is still ahead), running swaps to the gradient arc, paused keeps the arc but withholds the gradient so the break stays calm. Ring progress and the digits are both derived from the same `remainingMs`, so they cannot disagree. The active-task card was deliberately *not* built (needs a bound task = Task 11) nor the streak pill (Task 15). `tests/timer-ui.test.tsx` - 24 assertions pinning geometry, labels, store wiring, the 7/5 grid (ADR-004), and the two easy-to-regress DESIGN.md rules (no pure white, no 1px sectioning border). **Live-deployment-style bug found and fixed: Next 16 fails the build when a client component reads `Date.now()` while rendering** (`blocking-prerender-current-time`) - see deviations. Mutation-tested x16 - every mutation broke, including "skip completes the session instead" and the `Date.now()`-in-render regression. **Verified in a real browser** (Playwright against `next dev`): body `rgb(19,19,19)`, JetBrains Mono digits, `linear-gradient(145deg, ...)` CTA, round caps, **zero** elements painted white, no console errors, and idle/running/paused all render as designed. That pass caught the ring collapsing to the width of the digits (see deviations). Lint/`tsc`/build/121 tests green. |
-| 8-28 | not started | |
+| 8 | done | `convex/sessions.ts` + the store's completion path. **The append-only log dictated the design (ADR-003):** a duplicate, mis-stamped or mis-owned row can never be cleaned up, since CSV import is its only repair path - so `startedAt` semantics, exactly-once, and owner derivation are pinned by test rather than left to convention. `startedAt` needed a new `TimerState` field (not derivable: a resume rewrites `phaseEndsAt`, a mid-session settings change rewrites `durationMs`) and is **pause-adjusted**, so `completedAt - startedAt` is always the focus time actually spent; the cost - time-of-day bucketing shifts by the pause - is recorded as a **flagged assumption** in the deviations, overturnable before any row is recorded in anger. Logging lives in `complete()` so there is exactly one place a row can be produced, with `completeIfDue()` as the guarded entry the countdown calls; the guard reads the phase's own boundary, which is what makes it survive StrictMode's double effect and a repeated observation. `completedAt = min(phaseEndsAt, now)` so a backgrounded tab records when the session *ended*, not when it was finally noticed. **Server:** owner comes only from `resolveOwner` - there is deliberately no `ownerId` argument, and supplying one is refused - timestamps are validated rather than trusted, and idempotency runs against `by_owner_completed`. `taskId`/`projectId` are not accepted at all until Task 11 can authorize them, rather than accepted and unchecked. **All three phases are logged**, because §4.1's break-vs-focus split derives from this log and no later task adds break logging. New `components/session-logger.tsx` injects the `useMutation` writer at the root beside `AnonymousIdentity` - fire-and-forget, since §9 forbids the timer waiting on a round-trip. Gate: `tests/sessions.test.ts` (21 assertions, store → logger → real mutation → DB), mutation-tested x5 - every mutation killed. Lint/`tsc`/build/151 tests green; functions pushed to `dashing-caribou-892`. |
+| 9-28 | not started | |
