@@ -18,7 +18,9 @@ import {
 import {
   COUNTDOWN_TICK_MS,
   useCountdown,
+  usePhaseCompletion,
   useTimerStore,
+  type CompletedPhase,
 } from "@/lib/store/timer";
 
 /**
@@ -69,6 +71,14 @@ function resetStore() {
   useTimerStore.setState({
     state: initialTimerState(),
     settings: DEFAULT_SETTINGS,
+    // Task 11's binding lives beside the state it is derived from, so a
+    // reset that only clears the phase would leave the next test starting
+    // from somebody else's selection.
+    activeTask: null,
+    boundTask: null,
+    // The completion hook under test installs a logger; without this it would
+    // outlive the test that set it and count somebody else's phases.
+    sessionLogger: null,
   });
 }
 
@@ -351,3 +361,43 @@ describe("useCountdown is derived from the wall clock", () => {
 function CountdownProbe() {
   return createElement("span", null, String(useCountdown()));
 }
+
+describe("a face reading 00:00 still finishes its phase", () => {
+  it("re-checks the clock after the countdown has latched at zero", () => {
+    // The live-run regression, found by driving the real browser (Task 11's
+    // pass, Checkpoint B's pending question). `useCountdown` derives from
+    // `ceil(now / 250) * 250` — an instant up to 250ms *ahead* of the clock,
+    // so the face reads a smooth countdown — which means `remaining` clamps
+    // to 0 slightly *before* `phaseEndsAt` is reached. A dependency-gated
+    // effect asks once, is declined (correctly: the boundary has not
+    // passed), and can never ask again: `remaining` cannot leave 0 and
+    // `status` stays "running". The phase then sits at 00:00 forever and no
+    // session is ever written.
+    const logged: CompletedPhase[] = [];
+    useTimerStore.setState({ sessionLogger: (entry) => logged.push(entry) });
+    act(() => useTimerStore.getState().start());
+
+    // One tick away from the boundary — far enough that the real clock has
+    // not arrived, close enough that the rounded-up face already reads zero.
+    act(() => {
+      useTimerStore.setState((s) => ({
+        state: { ...s.state, phaseEndsAt: T0 + 100 },
+      }));
+    });
+
+    const { rerender } = renderHook(() => usePhaseCompletion(0));
+
+    // The first check is early: the correct answer to the wrong instant, so
+    // nothing is logged and the phase is still running.
+    expect(logged).toEqual([]);
+    expect(useTimerStore.getState().state.status).toBe("running");
+
+    // The clock crosses the boundary. The hook's argument cannot change —
+    // the face has latched at zero — so only a re-check can finish it.
+    vi.setSystemTime(T0 + 250);
+    rerender();
+
+    expect(logged).toHaveLength(1);
+    expect(logged[0].phase).toBe("focus");
+  });
+});

@@ -9,7 +9,7 @@
  * list (ADR-004: required functionality is expressed *inside* the
  * two-column composition).
  *
- * The list is presentational: it takes rows and four callbacks and owns only
+ * The list is presentational: it takes rows and five callbacks and owns only
  * drag state. The Convex binding lives one file over, in `task-panel.tsx`,
  * which is what lets everything below the mutation boundary be tested in
  * jsdom without a backend — jsdom has no layout, so the rectangle maths
@@ -39,6 +39,13 @@ interface TaskListProps<Id extends string> {
   onReorder: (draggedId: Id, afterId: Id | null, beforeId: Id | null) => void;
   onClearCompleted: () => void;
   /**
+   * Selects which task receives focus sessions — PRD §4.1. Called with the
+   * row's own id; whether that *clears* a selection already on it is the
+   * panel's call, not the list's, because it is the panel that knows the
+   * server's answer.
+   */
+  onSelect: (id: Id) => void;
+  /**
    * False while the anonymous identity is still being established.
    *
    * Only the add pill needs it: the list gate means there are no rows to
@@ -60,6 +67,7 @@ export function TaskList<Id extends string>({
   onToggle,
   onReorder,
   onClearCompleted,
+  onSelect,
   ready = true,
 }: TaskListProps<Id>) {
   const [draggedId, setDraggedId] = useState<Id | null>(null);
@@ -139,6 +147,7 @@ export function TaskList<Id extends string>({
             row={row}
             dragging={draggedId !== null && row.id === draggedId}
             onToggle={onToggle}
+            onSelect={onSelect}
             onDragStart={(id) => setDraggedId(id)}
             onDragOver={hover}
             onDragEnd={() => {

@@ -35,8 +35,17 @@ const PRD_6: Record<string, Record<string, boolean>> = {
   // `email` must be optional because the Anonymous provider creates a user
   // with no email at all. PRD §6's `createdAt` is the column the library
   // does not provide, so it stays required.
+  //
+  // `activeTaskId` is the other departure, and it is deliberate rather than
+  // drift: PRD §4.1 requires the selection "persisted per owner" while §6's
+  // data model lists nowhere to put it, so the column was added under §9's
+  // "ask first: Convex schema changes" (approved 2026-10-15 — on `users`,
+  // over a new one-row-per-owner table and over a client-side-only pointer).
+  // This map is a literal record of §6 *as the schema now stands*, which is
+  // why the change is written down here rather than exempted from the check.
   users: {
     createdAt: true,
+    activeTaskId: false,
     email: false,
     isAnonymous: false,
     name: false,
@@ -184,6 +193,10 @@ describe("convex/schema vs PRD 6", () => {
       ["settings", "ownerId", "users"],
       ["identities", "anonymousId", "users"],
       ["identities", "userId", "users"],
+      // Task 11's selection, approved under §9 — a pointer on the owner row
+      // must be an id too, or reading it back would be a `string` that can
+      // be cast to anything.
+      ["users", "activeTaskId", "tasks"],
     ];
 
     for (const [table, field, target] of ids) {

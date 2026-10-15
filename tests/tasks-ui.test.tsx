@@ -1,8 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useQuery } from "convex/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "@/convex/_generated/api";
 import { TaskList, type TaskRow } from "@/components/tasks/task-list";
 import { DEFAULT_ESTIMATE } from "@/components/tasks/task-input";
 import { TaskPanel, toTaskRows } from "@/components/tasks/task-panel";
@@ -52,6 +51,7 @@ function renderList(tasks: TaskRow<string>[]) {
   const onToggle = vi.fn();
   const onReorder = vi.fn();
   const onClearCompleted = vi.fn();
+  const onSelect = vi.fn();
 
   const view = render(
     <TaskList
@@ -60,10 +60,11 @@ function renderList(tasks: TaskRow<string>[]) {
       onToggle={onToggle}
       onReorder={onReorder}
       onClearCompleted={onClearCompleted}
+      onSelect={onSelect}
     />,
   );
 
-  return { ...view, onCreate, onToggle, onReorder, onClearCompleted };
+  return { ...view, onCreate, onToggle, onReorder, onClearCompleted, onSelect };
 }
 
 /**
@@ -277,6 +278,7 @@ describe("adding a task", () => {
         onToggle={vi.fn()}
         onReorder={vi.fn()}
         onClearCompleted={vi.fn()}
+        onSelect={vi.fn()}
         ready={false}
       />,
     );
@@ -323,6 +325,77 @@ describe("toggling completion", () => {
     );
 
     expect(onToggle).toHaveBeenCalledWith("d", false);
+  });
+
+  it("does not also select the task it completed", () => {
+    // One control, one job. Ticking the active task would otherwise drag the
+    // selection onto whatever was just finished — the running session's
+    // binding would follow it on the next start, silently.
+    const { onToggle, onSelect } = renderList(TASKS);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Complete Draft the outline" }),
+    );
+
+    expect(onToggle).toHaveBeenCalledWith("a", true);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe("selecting a task (PRD §4.1)", () => {
+  it("selects a row when it is clicked anywhere but the checkbox", () => {
+    const { onSelect } = renderList(TASKS);
+
+    fireEvent.click(rowFor("Draft the outline"));
+
+    expect(onSelect).toHaveBeenCalledWith("a");
+  });
+
+  it("selects a finished row too", () => {
+    // PRD §4.1 makes the selection about which task receives *sessions*, so
+    // a completed row is selectable — the rail marks the choice, not whether
+    // there is work left in it.
+    const { onSelect } = renderList(TASKS);
+
+    fireEvent.click(rowFor("Morning inbox zero"));
+
+    expect(onSelect).toHaveBeenCalledWith("d");
+  });
+
+  it("selects a row from the keyboard as well as the mouse", () => {
+    const { onSelect } = renderList(TASKS);
+
+    fireEvent.keyDown(rowFor("Draft the outline"), { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith("a");
+
+    fireEvent.keyDown(rowFor("Weekly 1:1 notes"), { key: " " });
+    expect(onSelect).toHaveBeenCalledWith("c");
+  });
+
+  it("keeps a keypress meant for the checkbox from selecting the row", () => {
+    // Enter activates a focused button — but the keydown still reaches the
+    // row above it. Without the target guard, every completion would also
+    // move the selection to the task it just ticked.
+    const { onSelect } = renderList(TASKS);
+
+    fireEvent.keyDown(
+      screen.getByRole("checkbox", { name: "Complete Draft the outline" }),
+      { key: "Enter" },
+    );
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("reports the selected row to assistive tech, and only that row", () => {
+    renderList(
+      TASKS.map((t) => ({ ...t, isActive: t.id === "c" })),
+    );
+
+    // `aria-current` rather than `aria-selected`, which is legal only inside
+    // a listbox the design never asked to become.
+    expect(rowFor("c").getAttribute("aria-current")).toBe("true");
+    expect(rowFor("a").hasAttribute("aria-current")).toBe(false);
+    expect(rowFor("d").hasAttribute("aria-current")).toBe(false);
   });
 });
 
@@ -458,19 +531,53 @@ describe("the row's design details", () => {
 });
 
 describe("toTaskRows", () => {
-  it("derives done from activeFlag and stubs the fields later tasks own", () => {
+  it("derives done from activeFlag and defaults the two facts the queries supply", () => {
     const rows = toTaskRows({
       active: [{ _id: "a", title: "open", estimate: 2, activeFlag: true }],
       completed: [{ _id: "b", title: "finished", estimate: 1, activeFlag: false }],
     });
 
     expect(rows).toEqual([
-      // completedLeaves: derived from the session log — Task 11.
-      // isActive: PRD's *selected* task — Task 11.
+      // No options means "nothing selected and no sessions yet", which is
+      // exactly what the panel shows while the two queries settle — an
+      // honest default, not a placeholder for a value on its way.
       // projectName: no projects exist yet — Task 13.
       { id: "a", title: "open", estimate: 2, done: false, completedLeaves: 0, isActive: false, projectName: null },
       { id: "b", title: "finished", estimate: 1, done: true, completedLeaves: 0, isActive: false, projectName: null },
     ]);
+  });
+
+  it("marks the selected row and reads its leaves from the queries' answers", () => {
+    // What the panel passes once `activeTask` and `leafCounts` have
+    // returned: the selection by id, and counts keyed by the same id.
+    const rows = toTaskRows(
+      {
+        active: [{ _id: "a", title: "open", estimate: 2, activeFlag: true }],
+        completed: [{ _id: "b", title: "finished", estimate: 1, activeFlag: false }],
+      },
+      { activeTaskId: "b", leaves: { a: 1, b: 4 } },
+    );
+
+    expect(rows.map((r) => ({ id: r.id, isActive: r.isActive, leaves: r.completedLeaves }))).toEqual([
+      // A finished task can be the selected one and keep its leaves: PRD
+      // §4.1 selects, it does not filter, and 4/1 is a real answer (a task
+      // over-delivered past its estimate).
+      { id: "a", isActive: false, leaves: 1 },
+      { id: "b", isActive: true, leaves: 4 },
+    ]);
+  });
+
+  it("treats an unknown selection id as no selection at all", () => {
+    // The shape for a pointer whose target is not in the list — a task
+    // deleted between the two queries — so no row draws a rail it cannot
+    // back with a real selection.
+    const rows = toTaskRows(
+      { active: [{ _id: "a", title: "open", estimate: 2, activeFlag: true }], completed: [] },
+      { activeTaskId: "gone", leaves: { a: 2 } },
+    );
+
+    expect(rows[0].isActive).toBe(false);
+    expect(rows[0].completedLeaves).toBe(2);
   });
 
   it("hands the panel an empty list while the query is still settling", () => {
@@ -559,18 +666,31 @@ vi.mock("@convex-dev/auth/react", () => ({
 }));
 
 describe("the panel waits for an identity", () => {
+  beforeEach(() => {
+    vi.mocked(useQuery).mockClear();
+  });
+
   afterEach(() => {
     gate.authenticated = true;
   });
 
-  it("holds the subscription back while there is no owner to resolve", () => {
+  it("holds every subscription back while there is no owner to resolve", () => {
     gate.authenticated = false;
 
     render(<TaskPanel />);
 
-    // `"skip"`, not `{}`: an empty call still reaches the server, and the
-    // server is right to reject it — there is no session behind it.
-    expect(useQuery).toHaveBeenLastCalledWith(api.tasks.list, "skip");
+    // All three, not "the last one": every query this panel makes resolves
+    // an owner, so all three must be gated together. Asserting on the
+    // *arguments* rather than on `toHaveBeenLastCalledWith(...)` is the point
+    // — the generated api hands back property-less proxies, so two different
+    // queries deep-compare equal and an assertion naming one of them passes
+    // no matter which one was actually called. A new owner-derived query that
+    // forgot the gate fails this line by changing the array's length.
+    expect(vi.mocked(useQuery).mock.calls.map(([, args]) => args)).toEqual([
+      "skip",
+      "skip",
+      "skip",
+    ]);
   });
 
   it("subscribes normally once the session is established", () => {
@@ -578,6 +698,10 @@ describe("the panel waits for an identity", () => {
 
     render(<TaskPanel />);
 
-    expect(useQuery).toHaveBeenLastCalledWith(api.tasks.list, {});
+    expect(vi.mocked(useQuery).mock.calls.map(([, args]) => args)).toEqual([
+      {},
+      {},
+      {},
+    ]);
   });
 });

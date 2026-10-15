@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import { resolveOwner } from "./lib/owner";
+import { requireOwnedProject, resolveOwner, taskIfYours } from "./lib/owner";
 import { mutation } from "./_generated/server";
 
 /**
@@ -22,11 +22,14 @@ import { mutation } from "./_generated/server";
  * each ran the same session to its end. A duplicate would corrupt every
  * derived number permanently, so the one indexed read is cheap insurance.
  *
- * `taskId`/`projectId` are **not** accepted here, though the schema has
- * them and Task 11 will bind them. Accepting an id today would mean
- * inserting it without having checked that it belongs to this owner — an
- * ownership hole handed straight to Task 11. They arrive when their
- * validation arrives.
+ * `taskId`/`projectId` arrive already **bound at start** by the client (D8:
+ * "assigned to `activeTaskId` at start, immutable thereafter"), so this file
+ * validates them rather than re-deriving them — re-reading the selection now
+ * would credit whatever was clicked after the session began, which is the
+ * re-targeting the acceptance criterion exists to prevent. Ownership is the
+ * caller-supplied id's first question (`lib/owner.ts`), and a reference that
+ * can no longer be proved is recorded as *unbound* rather than either trusted
+ * or allowed to cost the row: see `taskIfYours`.
  */
 
 /**
@@ -62,6 +65,14 @@ export const logCompleted = mutation({
     startedAt: v.number(),
     completedAt: v.number(),
     tzOffsetAtCompletion: v.number(),
+    /**
+     * The selection as it stood when this phase *began*, snapshotted by the
+     * client — D8 binds at start, so it is never read back from the server
+     * at completion. `undefined` means the phase began with nothing selected.
+     */
+    taskId: v.optional(v.id("tasks")),
+    /** The same snapshot's project, denormalized at start (PRD §6). */
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
@@ -90,6 +101,19 @@ export const logCompleted = mutation({
       throw new Error("logCompleted: tzOffsetAtCompletion is not a valid UTC offset");
     }
 
+    // Validated *before* anything is read for idempotency, so a caller whose
+    // id is not theirs is refused regardless of whether a row for these
+    // timestamps already exists.
+    const taskId =
+      args.taskId === undefined
+        ? undefined
+        : ((await taskIfYours(ctx, ownerId, args.taskId)) ?? undefined);
+
+    const projectId = args.projectId;
+    if (projectId !== undefined) {
+      await requireOwnedProject(ctx, ownerId, projectId);
+    }
+
     // Idempotency: `by_owner_completed` narrows to this exact completion
     // instant, which the client can only produce once per session.
     const existing = await ctx.db
@@ -104,16 +128,21 @@ export const logCompleted = mutation({
       existing.startedAt === startedAt &&
       existing.phase === args.phase
     ) {
+      // Returned, never rewritten: a repeat must not rebind a row that has
+      // already been recorded. The first write decides what it was bound to.
       return existing._id;
     }
 
-    // `taskId`/`projectId` are simply absent until Task 11 - the schema
-    // types them optional, so an unbound session is a row without them.
+    // Both are the client's snapshot from phase start (D8). `undefined` —
+    // not `null` — is how an unbound session is written, matching PRD §6's
+    // "present when…" optionality and `tasks.create`'s own `projectId`.
     return await ctx.db.insert("sessions", {
       ownerId,
       startedAt,
       completedAt,
       phase: args.phase,
+      taskId,
+      projectId,
       tzOffsetAtCompletion,
     });
   },

@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
+// `import type` only: erased at build, so the store still imports no client,
+// no env var and no server code — the seam that keeps it unit-testable stays
+// intact. What this buys is the *type* `Id<"tasks">`, so the binding handed
+// to `logCompleted` is the same nominal id the mutation's validator expects
+// instead of a bare `string` that would need a cast (and could be cast
+// wrongly) at the network boundary.
+import type { Id } from "@/convex/_generated/dataModel";
+
 import {
   DEFAULT_SETTINGS,
   completePhase,
@@ -33,6 +41,19 @@ import {
  */
 
 /**
+ * The selected task, and the project it was filed under when it was read —
+ * Task 11 (PRD §4.1).
+ *
+ * `projectId` is carried alongside so the session's snapshot can be taken in
+ * the same instant as the binding, rather than looked up later from a task
+ * that may since have been re-filed.
+ */
+export interface ActiveTask {
+  taskId: Id<"tasks">;
+  projectId?: Id<"projects">;
+}
+
+/**
  * One phase that ran to its own end — Task 8's hand-off to the session log.
  *
  * `startedAt`/`completedAt` are ms since epoch from the *client's* clock,
@@ -47,6 +68,15 @@ export interface CompletedPhase {
   startedAt: number;
   completedAt: number;
   tzOffsetAtCompletion: number;
+  /**
+   * The selection **as it stood when this phase began** — D8 binds at start
+   * and the binding is immutable afterwards, so this is a snapshot taken by
+   * `start`/`complete`, never a live read of `activeTask` at completion.
+   * Absent when the phase began with nothing selected.
+   */
+  taskId?: Id<"tasks">;
+  /** The same instant's project snapshot (PRD §6). */
+  projectId?: Id<"projects">;
 }
 
 /**
@@ -62,6 +92,26 @@ export type SessionLogger = (entry: CompletedPhase) => void;
 export interface TimerStore {
   state: TimerState;
   settings: TimerSettings;
+
+  /**
+   * The selection — which task the *next* phase to begin will bind to
+   * (PRD §4.1). Fed by the panel, the one place that knows both the id and
+   * the project the task is filed under.
+   *
+   * Changing it never disturbs `boundTask`, and that is deliberate: D8 says
+   * a session is assigned at start and immutable thereafter, so clicking
+   * another task mid-session must not be able to re-target the one running.
+   */
+  activeTask: ActiveTask | null;
+  setActiveTask: (task: ActiveTask | null) => void;
+
+  /**
+   * The binding of the phase that is currently running, snapshotted the
+   * moment it began. It is `null` exactly while `state.startedAt` is — the
+   * invariant that makes "was this session bound?" answerable without a
+   * second flag: a running phase has a binding, an idle one has none.
+   */
+  boundTask: ActiveTask | null;
 
   /**
    * Where a completed phase is recorded. `null` until the app injects one,
@@ -97,87 +147,160 @@ export interface TimerStore {
   setSettings: (patch: Partial<TimerSettings>) => void;
 }
 
-export const useTimerStore = create<TimerStore>((set, get) => ({
-  state: initialTimerState(),
-  settings: DEFAULT_SETTINGS,
+/**
+ * The binding the phase described by `next` should hold — Task 11's one rule.
+ *
+ * D8: a session is assigned to `activeTaskId` **at start**, immutable
+ * thereafter. Stated as a function of two adjacent states rather than as a
+ * flag set inside each action, because there are four distinct ways a phase
+ * can begin or end and a rule applied in one place cannot be forgotten in
+ * another.
+ *
+ *   - **`next` is idle** → nothing is running, so nothing is bound. Reset,
+ *     switching tabs, and a skip whose next phase does not auto-start all
+ *     land here.
+ *   - **same phase with its clock still live** → pause, resume, and `start()`
+ *     called on a phase already running. These are interruptions of *this*
+ *     session, so the binding it began with stands no matter how often the
+ *     selection changed while they happened.
+ *   - **otherwise** a new phase began — `start` from idle, or `enterPhase`
+ *     auto-starting the next one after a completion or skip — so it binds
+ *     the selection *as it is now*.
+ *
+ * That last branch is why a task picked during a break receives the focus
+ * session that follows, while a task picked during that focus session does
+ * not receive it.
+ */
+function nextBinding(
+  previous: TimerState,
+  next: TimerState,
+  selection: ActiveTask | null,
+  bound: ActiveTask | null,
+): ActiveTask | null {
+  if (next.startedAt === null) {
+    return null;
+  }
+  if (previous.startedAt !== null && previous.phase === next.phase) {
+    return bound;
+  }
+  return selection;
+}
 
-  sessionLogger: null,
-  setSessionLogger: (sessionLogger) => set({ sessionLogger }),
+export const useTimerStore = create<TimerStore>((set, get) => {
+  /**
+   * Applies an engine transition *and* re-derives the in-flight binding.
+   *
+   * Every state change funnels through here — including ones that look
+   * incapable of affecting a binding, such as pause — so the invariant "a
+   * running phase has a binding, an idle one has none" holds by
+   * construction rather than by every action remembering it. `extra` exists
+   * for the one caller that changes something alongside the state
+   * (`setSettings`); the derived fields are written last and always win.
+   */
+  const transition = (next: TimerState, extra?: Partial<TimerStore>): void => {
+    const { state: previous, activeTask, boundTask } = get();
+    set({
+      ...extra,
+      state: next,
+      boundTask: nextBinding(previous, next, activeTask, boundTask),
+    });
+  };
 
-  start: () =>
-    set({ state: startPhase(get().state, get().settings, Date.now()) }),
+  return {
+    state: initialTimerState(),
+    settings: DEFAULT_SETTINGS,
 
-  pause: () => set({ state: pauseTimer(get().state, Date.now()) }),
+    activeTask: null,
+    boundTask: null,
 
-  resume: () =>
-    set({ state: resumeTimer(get().state, get().settings, Date.now()) }),
+    // Selection only: `boundTask` is deliberately untouched here, which is
+    // precisely D8's requirement. A session running right now keeps the
+    // binding it began with, whatever is clicked in the meantime.
+    setActiveTask: (activeTask) => set({ activeTask }),
 
-  reset: () => set({ state: resetTimer(get().state) }),
+    sessionLogger: null,
+    setSessionLogger: (sessionLogger) => set({ sessionLogger }),
 
-  skip: () =>
-    set({ state: skipPhase(get().state, get().settings, Date.now()) }),
+    start: () => transition(startPhase(get().state, get().settings, Date.now())),
 
-  complete: () => {
-    const now = Date.now();
-    const { state, settings, sessionLogger } = get();
+    pause: () => transition(pauseTimer(get().state, Date.now())),
 
-    // Transition first, and unconditionally. PRD §9 is explicit that the
-    // timer never waits on a network round-trip, so a writer that throws
-    // must not be able to leave the face frozen at 00:00 — the cycle moves
-    // whether or not the row gets away.
-    set({ state: completePhase(state, settings, now) });
+    resume: () =>
+      transition(resumeTimer(get().state, get().settings, Date.now())),
 
-    // A phase that never began has no span to record. `startedAt` is null
-    // exactly while idle, so calling `complete()` on a waiting phase moves
-    // the cycle and writes nothing — fabricating a start from the phase's
-    // nominal duration would invent focus time that was never spent.
-    if (state.startedAt === null || sessionLogger === null) {
-      return;
-    }
+    reset: () => transition(resetTimer(get().state)),
 
-    // `phaseEndsAt` is when the phase *actually* ended, which matters when
-    // a backgrounded tab only notices the boundary minutes late; `now` is
-    // earlier than it whenever the phase was finished ahead of schedule.
-    // Taking the earlier of the two is correct in both directions.
-    const completedAt = Math.min(state.phaseEndsAt ?? now, now);
+    skip: () => transition(skipPhase(get().state, get().settings, Date.now())),
 
-    try {
-      sessionLogger({
-        phase: state.phase,
-        startedAt: state.startedAt,
-        completedAt,
-        tzOffsetAtCompletion: -new Date(completedAt).getTimezoneOffset(),
-      });
-    } catch (error) {
-      // Logged, not rethrown: losing a row is bad, stranding the timer is
-      // worse, and this write is fire-and-forget by design.
-      console.error("locked-in: could not record the completed session", error);
-    }
-  },
+    complete: () => {
+      const now = Date.now();
+      // Read *before* the transition: `boundTask` here is the binding of the
+      // phase that is about to end, not whatever the next one picks up.
+      const { state, settings, sessionLogger, boundTask } = get();
 
-  completeIfDue: () => {
-    // The exactly-once gate. It reads the phase's own boundary rather than
-    // a flag the caller sets, and the first completion *moves* that
-    // boundary: the next phase either starts in the future or goes idle, so
-    // a second entry returns false instead of appending a twin row. React
-    // running an effect twice in development is the case this exists for —
-    // without it, "exactly one session row" fails on the first StrictMode
-    // render.
-    if (!isPhaseComplete(get().state, Date.now())) {
-      return false;
-    }
-    get().complete();
-    return true;
-  },
+      // Transition first, and unconditionally. PRD §9 is explicit that the
+      // timer never waits on a network round-trip, so a writer that throws
+      // must not be able to leave the face frozen at 00:00 — the cycle moves
+      // whether or not the row gets away.
+      transition(completePhase(state, settings, now));
 
-  setPhase: (phase) =>
-    set({ state: selectPhase(get().state, phase, get().settings) }),
+      // A phase that never began has no span to record. `startedAt` is null
+      // exactly while idle, so calling `complete()` on a waiting phase moves
+      // the cycle and writes nothing — fabricating a start from the phase's
+      // nominal duration would invent focus time that was never spent.
+      if (state.startedAt === null || sessionLogger === null) {
+        return;
+      }
 
-  setSettings: (patch) => {
-    const settings = { ...get().settings, ...patch };
-    set({ settings, state: normalizeState(get().state, settings) });
-  },
-}));
+      // `phaseEndsAt` is when the phase *actually* ended, which matters when
+      // a backgrounded tab only notices the boundary minutes late; `now` is
+      // earlier than it whenever the phase was finished ahead of schedule.
+      // Taking the earlier of the two is correct in both directions.
+      const completedAt = Math.min(state.phaseEndsAt ?? now, now);
+
+      try {
+        sessionLogger({
+          phase: state.phase,
+          startedAt: state.startedAt,
+          completedAt,
+          tzOffsetAtCompletion: -new Date(completedAt).getTimezoneOffset(),
+          // Absent, not null, when the phase began with nothing selected —
+          // so `logCompleted` sees no argument at all rather than a pointer
+          // to nothing. Both fields are snapshots from *this* phase's start.
+          taskId: boundTask?.taskId,
+          projectId: boundTask?.projectId,
+        });
+      } catch (error) {
+        // Logged, not rethrown: losing a row is bad, stranding the timer is
+        // worse, and this write is fire-and-forget by design.
+        console.error("locked-in: could not record the completed session", error);
+      }
+    },
+
+    completeIfDue: () => {
+      // The exactly-once gate. It reads the phase's own boundary rather than
+      // a flag the caller sets, and the first completion *moves* that
+      // boundary: the next phase either starts in the future or goes idle, so
+      // a second entry returns false instead of appending a twin row. React
+      // running an effect twice in development is the case this exists for —
+      // without it, "exactly one session row" fails on the first StrictMode
+      // render.
+      if (!isPhaseComplete(get().state, Date.now())) {
+        return false;
+      }
+      get().complete();
+      return true;
+    },
+
+    setPhase: (phase) =>
+      transition(selectPhase(get().state, phase, get().settings)),
+
+    setSettings: (patch) => {
+      const settings = { ...get().settings, ...patch };
+      transition(normalizeState(get().state, settings), { settings });
+    },
+  };
+});
 
 /**
  * How often the countdown re-renders, in ms.
@@ -263,9 +386,24 @@ export function usePhaseCompletion(remaining: number): void {
   const status = useTimerStore((s) => s.state.status);
   const completeIfDue = useTimerStore((s) => s.completeIfDue);
 
+  // Deliberately **not** dependency-gated, and that is the whole point.
+  //
+  // `remaining` is computed from `ceil(now / 250) * 250` — an instant up to
+  // 250ms *ahead* of the clock, so the face reads a smooth second-by-second
+  // countdown. It therefore latches at its clamped zero slightly before
+  // `phaseEndsAt` is actually reached. That first zero fires this effect
+  // once, `completeIfDue` reads the real clock and rightly declines — and
+  // with a dependency array nothing could ever ask again: `remaining`
+  // cannot change away from 0, and `status` stays "running". The phase then
+  // sits at 00:00 forever and no session is ever written, which is precisely
+  // what the live run reproduced.
+  //
+  // Re-checking after every render is safe because `completeIfDue` re-reads
+  // the clock and is idempotent by construction (Task 8), and this component
+  // only re-renders on the countdown's own tick while a phase is running.
   useEffect(() => {
     if (status === "running" && remaining === 0) {
       completeIfDue();
     }
-  }, [remaining, status, completeIfDue]);
+  });
 }

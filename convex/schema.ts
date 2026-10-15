@@ -45,6 +45,28 @@ export default defineSchema({
   users: defineTable({
     // PRD §6
     createdAt: v.number(),
+    /**
+     * PRD §4.1's selection — "clicking a task selects it … `activeTaskId`
+     * persisted per owner" — which §6's data model gives **no column at all**.
+     * Adding one was therefore an §9 ask-first schema change (approved
+     * 2026-10-15: a column on `users`, chosen over a new one-row-per-owner
+     * table and over a client-side-only pointer).
+     *
+     * It is a *pointer*, so it inherits none of a foreign key's lifecycle
+     * duties: it is written only after `requireOwnedTask` has proved the
+     * target belongs to this owner, and read back through the row's own
+     * primary key — which is exactly what `resolveOwner` already returns, so
+     * selection costs one `patch` with no lookup and one point read.
+     *
+     * It is deliberately **left pointing at a task that has been completed**
+     * (Task 11: a finished task keeps receiving sessions until another is
+     * chosen), and deliberately **cleared** by `clearCompleted`, the one
+     * place that deletes the rows it can point at.
+     *
+     * Unindexed: selection is read and written by owner id alone, which is
+     * the primary key. Nothing ever searches *for* owners by their choice.
+     */
+    activeTaskId: v.optional(v.id("tasks")),
     // Convex Auth profile fields
     email: v.optional(v.string()),
     isAnonymous: v.optional(v.boolean()),

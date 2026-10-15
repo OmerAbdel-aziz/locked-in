@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 /**
@@ -62,4 +62,85 @@ export async function resolveOwner(ctx: OwnerCtx): Promise<Id<"users">> {
   }
 
   return userId;
+}
+
+/**
+ * Fetches a task and proves it belongs to `ownerId`.
+ *
+ * A row owned by someone else takes the same path as a row that does not
+ * exist — an attacker probing ids learns nothing either way, which is why
+ * the message names the table rather than the reason.
+ *
+ * It lived in `tasks.ts` until Task 11, when `logCompleted` had to answer a
+ * second, subtly different ownership question about the `taskId` a client
+ * hands over at completion. Two files each with their own idea of what
+ * "yours" means is how the two quietly stop agreeing — one of them is
+ * written in a hurry and neither gets revisited — so every version of the
+ * question lives here, in the module that already owns ownership.
+ *
+ * Typed against `OwnerCtx` rather than `MutationCtx`: the read *is* the
+ * whole check, so a query can use it as readily as a mutation.
+ */
+export async function requireOwnedTask(
+  ctx: OwnerCtx,
+  ownerId: Id<"users">,
+  taskId: Id<"tasks">,
+): Promise<Doc<"tasks">> {
+  const task = await ctx.db.get(taskId);
+  if (task === null || task.ownerId !== ownerId) {
+    throw new Error("tasks: task not found");
+  }
+  return task;
+}
+
+/** Same contract as `requireOwnedTask`, for a project a task is filed under. */
+export async function requireOwnedProject(
+  ctx: OwnerCtx,
+  ownerId: Id<"users">,
+  projectId: Id<"projects">,
+): Promise<Doc<"projects">> {
+  const project = await ctx.db.get(projectId);
+  if (project === null || project.ownerId !== ownerId) {
+    throw new Error("tasks: project not found");
+  }
+  return project;
+}
+
+/**
+ * The reference to record *about* a session, or `null` when it can no longer
+ * be proved.
+ *
+ * `requireOwnedTask` is the wrong shape for a historical binding, because it
+ * insists the row still exists — and a task can be deleted while its focus
+ * session is still running (`clearCompleted` is one click away). `sessions`
+ * is append-only with CSV import as its only repair path (ADR-003), so
+ * refusing the write would lose the session itself over a missing footnote.
+ *
+ * Three outcomes, each deliberate:
+ *
+ *   - **exists and ours** → the id, recorded as it was bound at start (D8);
+ *   - **no longer exists** → `null`, so the row is written *without* an id
+ *     that can no longer be proved. Nothing dangling is ever stored, which
+ *     also means a foreign id whose target has since been deleted takes
+ *     this path and lands as "unbound" rather than as a claim;
+ *   - **exists and somebody else's** → throws. The one case worth refusing:
+ *     an attempt to attribute a session to a row the caller has no claim on.
+ *
+ * Projects have no equivalent here: `archivedAt` hides a project without
+ * deleting it (PRD §6), so `requireOwnedProject` cannot race the same way
+ * and remains exactly right for `sessions.projectId`.
+ */
+export async function taskIfYours(
+  ctx: OwnerCtx,
+  ownerId: Id<"users">,
+  taskId: Id<"tasks">,
+): Promise<Id<"tasks"> | null> {
+  const task = await ctx.db.get(taskId);
+  if (task === null) {
+    return null;
+  }
+  if (task.ownerId !== ownerId) {
+    throw new Error("tasks: task not found");
+  }
+  return taskId;
 }

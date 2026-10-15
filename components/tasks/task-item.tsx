@@ -9,10 +9,14 @@
  * strikethrough, and no handle — finished rows are not somewhere you drag,
  * which is also what Task 9's open/completed boundary rule expects).
  *
- * The green left border is the design's active-task marker. It renders from
- * `row.isActive`, which nothing sets yet: PRD §4.2 makes it the *selected*
- * task and selection needs `activeTaskId`, which Task 11 introduces. Drawing
- * it on an arbitrary row would invent a selection nobody made.
+ * The green left border is the design's active-task marker — `code.html`
+ * draws exactly `border-l-2 border-primary` on the row and nothing else —
+ * and it renders from `row.isActive`, which the panel sets from the owner's
+ * `activeTaskId` (Task 11).
+ *
+ * Clicking a row selects it (PRD §4.1), except on the checkbox: completing
+ * a task and selecting it are two different decisions, and one control doing
+ * both would make ticking a box silently re-aim the running timer.
  */
 
 import type { DropPosition } from "@/lib/task-order";
@@ -27,12 +31,13 @@ export interface TaskRow<Id extends string = string> {
   estimate: number;
   done: boolean;
   /**
-   * Focus sessions recorded against this task. Derived from the session log
-   * (ADR-003) — it is `0` until Task 11 binds sessions to tasks, which is
-   * its own acceptance criterion; nothing here may store the count.
+   * Focus sessions recorded against this task, derived from the session log
+   * on read (ADR-003) — nothing here may store the count. It may legitimately
+   * exceed `estimate`: a task that is finished keeps receiving focus time
+   * until another is selected (Task 11).
    */
   completedLeaves: number;
-  /** The selected task, once Task 11 introduces `activeTaskId`. */
+  /** The selected task — PRD §4.1's `activeTaskId`, drawn as the green rail. */
   isActive: boolean;
   /** Rendered inline beside the title; `null` while no project exists (Task 13). */
   projectName: string | null;
@@ -43,6 +48,8 @@ interface TaskItemProps<Id extends string> {
   /** True while this row is the one being dragged. */
   dragging: boolean;
   onToggle: (id: Id, next: boolean) => void;
+  /** Selects (or, on the active row, clears) which task receives sessions. */
+  onSelect: (id: Id) => void;
   onDragStart: (id: Id) => void;
   onDragOver: (id: Id, position: DropPosition) => void;
   onDragEnd: () => void;
@@ -52,6 +59,7 @@ export function TaskItem<Id extends string>({
   row,
   dragging,
   onToggle,
+  onSelect,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -69,6 +77,30 @@ export function TaskItem<Id extends string>({
       role="listitem"
       data-task-id={String(row.id)}
       draggable={!row.done}
+      // PRD §4.1: "clicking a task selects it". A drag does not reach here —
+      // browsers suppress the click that would follow a completed drop — so
+      // a reordering gesture cannot double as a selection.
+      onClick={() => onSelect(row.id)}
+      onKeyDown={(event) => {
+        // Only when the row itself holds focus. Enter/Space landing on the
+        // checkbox *inside* it must not also select: a keydown still bubbles
+        // even though that button's click is stopped below, so the guard is
+        // the target rather than the event.
+        if (event.target !== event.currentTarget) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(row.id);
+        }
+      }}
+      // Focusable so a decision this consequential — it chooses what the
+      // running timer will credit — is reachable without a pointer. PRD
+      // describes the gesture as a click, not as a mouse-only feature.
+      tabIndex={0}
+      // The selection state, in a form assistive tech reports on a listitem
+      // without inventing a listbox the design never asked for.
+      aria-current={row.isActive ? "true" : undefined}
       onDragStart={(event) => {
         // Firefox refuses to start a drag unless something has been written
         // to the transfer; Chrome does not care either way. The list does not
@@ -92,7 +124,7 @@ export function TaskItem<Id extends string>({
         onDragOver(row.id, position);
       }}
       onDragEnd={onDragEnd}
-      className={`group flex cursor-grab items-center justify-between rounded-xl p-4 transition-colors active:cursor-grabbing ${shell}${
+      className={`group flex cursor-grab items-center justify-between rounded-xl p-4 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 active:cursor-grabbing ${shell}${
         row.isActive ? " border-l-2 border-primary" : ""
       }${dragging ? " opacity-40" : ""}`}
     >
@@ -102,7 +134,13 @@ export function TaskItem<Id extends string>({
           role="checkbox"
           aria-checked={row.done}
           aria-label={`${row.done ? "Uncomplete" : "Complete"} ${row.title}`}
-          onClick={() => onToggle(row.id, !row.done)}
+          onClick={(event) => {
+            // Completing must not also select: the row above owns selection,
+            // and one control making both decisions would mean ticking the
+            // active task silently re-aims what the running timer credits.
+            event.stopPropagation();
+            onToggle(row.id, !row.done);
+          }}
           className={checkbox}
         >
           {row.done ? <CheckIcon className="size-3.5" /> : null}

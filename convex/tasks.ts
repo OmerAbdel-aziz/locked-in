@@ -14,7 +14,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { orderBetween } from "./lib/order";
-import { resolveOwner } from "./lib/owner";
+import {
+  requireOwnedProject,
+  requireOwnedTask,
+  resolveOwner,
+} from "./lib/owner";
 
 /** PRD §4.2 lets a title be edited inline; this bounds a single row. */
 const MAX_TITLE_LENGTH = 200;
@@ -59,34 +63,10 @@ function validEstimate(raw: number): number {
 }
 
 /**
- * Fetches a task and proves it belongs to `ownerId`. A row owned by someone
- * else takes the same path as a row that does not exist — an attacker probing
- * ids learns nothing either way.
+ * Ownership of a referenced row is proved by `requireOwnedTask` /
+ * `requireOwnedProject` in `lib/owner.ts`, which `logCompleted` needs too —
+ * see that module for why the check has one home rather than one copy here.
  */
-async function requireTask(
-  ctx: MutationCtx,
-  ownerId: Id<"users">,
-  taskId: Id<"tasks">,
-): Promise<Doc<"tasks">> {
-  const task = await ctx.db.get(taskId);
-  if (task === null || task.ownerId !== ownerId) {
-    throw new Error("tasks: task not found");
-  }
-  return task;
-}
-
-/** Same contract as `requireTask`, for the optional project a task is filed under. */
-async function requireProject(
-  ctx: MutationCtx,
-  ownerId: Id<"users">,
-  projectId: Id<"projects">,
-): Promise<Doc<"projects">> {
-  const project = await ctx.db.get(projectId);
-  if (project === null || project.ownerId !== ownerId) {
-    throw new Error("tasks: project not found");
-  }
-  return project;
-}
 
 /**
  * The bucket a task's `order` is compared within.
@@ -136,7 +116,7 @@ export const create = mutation({
     const title = validTitle(args.title);
     const estimate = validEstimate(args.estimate);
     if (args.projectId !== undefined) {
-      await requireProject(ctx, ownerId, args.projectId);
+      await requireOwnedProject(ctx, ownerId, args.projectId);
     }
 
     const last = await lastOpenTask(ctx, ownerId);
@@ -171,7 +151,7 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
-    const task = await requireTask(ctx, ownerId, args.taskId);
+    const task = await requireOwnedTask(ctx, ownerId, args.taskId);
 
     const patch: Partial<Doc<"tasks">> = {};
     if (args.title !== undefined) {
@@ -187,7 +167,7 @@ export const update = mutation({
         // rather than an omission.
         patch.projectId = undefined;
       } else {
-        await requireProject(ctx, ownerId, args.projectId);
+        await requireOwnedProject(ctx, ownerId, args.projectId);
         patch.projectId = args.projectId;
       }
     }
@@ -210,7 +190,7 @@ export const complete = mutation({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
-    const task = await requireTask(ctx, ownerId, args.taskId);
+    const task = await requireOwnedTask(ctx, ownerId, args.taskId);
 
     await ctx.db.patch(task._id, {
       activeFlag: false,
@@ -233,7 +213,7 @@ export const uncomplete = mutation({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
-    const task = await requireTask(ctx, ownerId, args.taskId);
+    const task = await requireOwnedTask(ctx, ownerId, args.taskId);
 
     await ctx.db.patch(task._id, {
       activeFlag: true,
@@ -270,6 +250,25 @@ export const clearCompleted = mutation({
         break;
       }
     }
+
+    // The selection must not outlive the row it points at. This is the only
+    // mutation that deletes tasks, so it is the only place a stored pointer
+    // can be left dangling — and the reader below hides a dead id rather
+    // than reporting one, which is right for the UI but the wrong shape to
+    // leave on the document. One point read, and only when something is
+    // selected at all.
+    //
+    // Note this clears a pointer to a *deleted* task, never one to a merely
+    // completed task: ticking a box leaves the selection in place (Task 11),
+    // and only removing the row outright takes it away.
+    const owner = await ctx.db.get(ownerId);
+    if (owner?.activeTaskId !== undefined) {
+      const target = await ctx.db.get(owner.activeTaskId);
+      if (target === null) {
+        await ctx.db.patch(ownerId, { activeTaskId: undefined });
+      }
+    }
+
     return deleted;
   },
 });
@@ -320,7 +319,7 @@ export const reorder = mutation({
   },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
-    const task = await requireTask(ctx, ownerId, args.taskId);
+    const task = await requireOwnedTask(ctx, ownerId, args.taskId);
 
     const afterId = args.afterId ?? null;
     const beforeId = args.beforeId ?? null;
@@ -349,12 +348,12 @@ export const reorder = mutation({
     // Both neighbours are checked before any anchor is read, so a stale or
     // foreign id is reported while it is still the only thing wrong.
     if (afterId !== null) {
-      const after = await requireTask(ctx, ownerId, afterId);
+      const after = await requireOwnedTask(ctx, ownerId, afterId);
       assertSameBucket(task, after);
       preceding = after.order;
     }
     if (beforeId !== null) {
-      const before = await requireTask(ctx, ownerId, beforeId);
+      const before = await requireOwnedTask(ctx, ownerId, beforeId);
       assertSameBucket(task, before);
       following = before.order;
     }
@@ -441,5 +440,114 @@ export const list = query({
     const completed = await bucketTasks(ctx, ownerId, false).take(LIST_LIMIT);
 
     return { active, completed };
+  },
+});
+
+/**
+ * The owner's current selection — PRD §4.1 — or `null` when there is none.
+ *
+ * A pointer whose target has been deleted reads as `null` rather than as a
+ * dead id: no caller wants an id that names no row, and `clearCompleted`
+ * (the only thing that deletes tasks) repairs the stored value anyway. The
+ * ownership check on the way back out is free beside the read it follows,
+ * and stored state is precisely what must not be trusted on its way out.
+ */
+export const activeTask = query({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await resolveOwner(ctx);
+    const owner = await ctx.db.get(ownerId);
+    const taskId = owner?.activeTaskId;
+
+    if (taskId === undefined) {
+      return null;
+    }
+
+    const task = await ctx.db.get(taskId);
+    return task === null || task.ownerId !== ownerId ? null : taskId;
+  },
+});
+
+/**
+ * Selects the task that receives focus sessions — PRD §4.1.
+ *
+ * `taskId: null` clears it. `undefined` would mean "leave it alone", which
+ * is why the validator admits `null` alongside the id — the same shape
+ * `update` uses to unbind a project.
+ *
+ * A *completed* task may be selected, and once selected stays selected until
+ * another is chosen (Task 11: "completed tasks keep their binding"), so
+ * there is no `activeFlag` test here. The binding a running session already
+ * captured is deliberately untouched: `logCompleted` carries the snapshot
+ * the client took at start (D8), so re-pointing the selection mid-session
+ * cannot re-target a session that is under way.
+ */
+export const selectTask = mutation({
+  args: { taskId: v.union(v.id("tasks"), v.null()) },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+
+    if (args.taskId === null) {
+      // `patch` deletes a field given `undefined`, so the key is present
+      // here with an undefined value precisely so the clear is a change
+      // rather than an omission.
+      await ctx.db.patch(ownerId, { activeTaskId: undefined });
+      return null;
+    }
+
+    // Proved before it is stored: the pointer is only ever as trustworthy as
+    // the check that wrote it, and `activeTask` re-checks on the way out.
+    await requireOwnedTask(ctx, ownerId, args.taskId);
+    await ctx.db.patch(ownerId, { activeTaskId: args.taskId });
+    return args.taskId;
+  },
+});
+
+/**
+ * Focus sessions per task — PRD §4.1's leaf progress, derived and never
+ * stored (ADR-003).
+ *
+ * Only `phase: "focus"` counts: breaks are sessions too, but no task is
+ * made of them. The division the row draws (`3 / 2`) happens past this, in
+ * the component, and may legitimately exceed the estimate — a finished task
+ * keeps receiving focus time until another is selected.
+ *
+ * Cost is one index range per task, each bounded by *that task's own*
+ * history rather than by the log's: `by_owner_task` starts at
+ * `(ownerId, taskId)`, so a task with four sessions reads four rows however
+ * many thousands exist elsewhere. That is what keeps this off the full-log
+ * pull the schema header warns about. The loop is bounded by `LIST_LIMIT`
+ * tasks; a list long enough to make it hurt is long enough to revisit this.
+ *
+ * `by_owner_task` does not carry `phase`, so break rows are read and
+ * discarded. Adding phase to the index would be a second schema change that
+ * nobody asked for, to avoid reading the same handful of break rows.
+ *
+ * A key is absent only for a task the log has never seen — the component
+ * reads a missing key as `0`.
+ */
+export const leafCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await resolveOwner(ctx);
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(LIST_LIMIT);
+
+    const counts: Record<string, number> = {};
+    for (const task of tasks) {
+      const focus = await ctx.db
+        .query("sessions")
+        .withIndex("by_owner_task", (q) =>
+          q.eq("ownerId", ownerId).eq("taskId", task._id),
+        )
+        .filter((q) => q.eq(q.field("phase"), "focus"))
+        .collect();
+      counts[task._id] = focus.length;
+    }
+
+    return counts;
   },
 });
