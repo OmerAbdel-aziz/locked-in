@@ -16,6 +16,7 @@ Plan-specific conventions:
 - **Timer is client-only** (Zustand, timestamp-anchored). Network is never consulted for ticking.
 - **Owner resolution:** every Convex query/mutation resolves owner through the `identities` link (anonymous id or linked user) — one helper, used everywhere.
 - **Online-only:** no offline buffering anywhere (PRD D9).
+- **Task ordering is a fractional index** (decided in Task 9), on the existing numeric `tasks.order`: a drag computes a key between its two neighbours and writes only that one row, so a reorder never renumbers the list and two drags in different gaps cannot overwrite each other. Integer ranks would need a whole-list write per drag, and concurrent drags would each renumber the list into a different shape — one intent silently lost. Keys stay numbers because the schema already declares `v.number()` and widening it to a string index is a PRD §9 ask-first schema change that was not asked for. The one cost is float64 precision: a *single gap* absorbs ~52 successive inserts into it before there is no representable key left; `lib/order.ts` fails loudly rather than emitting a duplicate, and end-of-list appends never split a gap so they do not consume that headroom.
 
 ## Dependency Graph
 
@@ -124,6 +125,6 @@ Convex schema + anonymous identity
 
 ## Open Questions
 
-- Drag-reorder ordering scheme (fractional index vs. ranks) — decide in Task 9 (lean: fractional).
+- ~~Drag-reorder ordering scheme (fractional index vs. ranks)~~ — **decided in Task 9: fractional index.** Recorded under Architecture Decisions above; rationale and its one limit (float64 gap exhaustion, ~52 inserts into a single gap) are written up at the head of `convex/lib/order.ts`.
 - Charting approach — lean hand-rolled SVG (PRD §11.5); confirm at Task 20.
 - Convex vs. Vercel frontend hosting — verify at Task 28.
