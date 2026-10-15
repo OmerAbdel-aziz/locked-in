@@ -21,8 +21,27 @@ import { useTimerStore } from "@/lib/store/timer";
  * present and wired to the store.
  *
  * The two DESIGN.md rules that are easy to regress silently get their own
- * tests: no pure white anywhere, and no 1px border used to section content.
+ * tests: no pure white anywhere, and no 1px border used to section content
+ * (with the §5 exception for interactive affordances, which the task list
+ * now exercises).
  */
+
+/*
+ * `page.tsx` renders the live task panel (Task 10), whose `useQuery` must
+ * sit inside a `ConvexProvider`. These tests are about the *rendered markup*
+ * and the store, so the Convex binding is stubbed at the module boundary
+ * rather than faked with a client that would try to open a socket. The
+ * panel's own behaviour is `tests/tasks-ui.test.tsx`; the live queries are
+ * the Task 10 browser run-through.
+ */
+vi.mock("convex/react", () => ({
+  useQuery: () => undefined,
+  useMutation: () => () => Promise.resolve(),
+}));
+
+vi.mock("@convex-dev/auth/react", () => ({
+  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+}));
 
 const MIN = 60_000;
 
@@ -374,14 +393,31 @@ describe("DESIGN.md's binding rules hold in the rendered output", () => {
   it("sections with tonal shifts, never a 1px divider", () => {
     const { container } = render(<Page />);
 
+    // A directional border at Tailwind's *default* width is the 1px divider
+    // §5 forbids; `divide-*` is the same thing one abstraction up. Explicit
+    // widths are affordances the design itself draws — the tab underline
+    // (`border-b-2`) and the active-task rail (`border-l-2`).
     const onePixelLines = allClasses(container).filter(
       (cls) =>
-        // The default Tailwind border width is 1px; any explicit `border-b-2`
-        // and the tab underline are control affordances, not sectioning.
-        /^border(-(t|r|b|l|x|y))?$/.test(cls) || /^divide-/.test(cls),
+        /^border(-(t|r|b|l|x|y))$/.test(cls) || /^divide-/.test(cls),
     );
 
     expect(onePixelLines).toEqual([]);
+
+    // Bare `border` (also 1px by default) is §5's *permitted* case: "a 1px
+    // solid border is reserved for interactive affordances such as inputs."
+    // In this app that is the task row's checkbox — the design's own markup
+    // draws it with `border border-outline-variant` — and nothing else.
+    const bareBorders = Array.from(container.querySelectorAll("*")).filter(
+      (el) => el.classList.contains("border"),
+    );
+    const notAffordances = bareBorders.filter(
+      (el) => el.getAttribute("role") !== "checkbox",
+    );
+
+    expect(
+      notAffordances.map((el) => el.outerHTML.slice(0, 70)),
+    ).toEqual([]);
   });
 });
 

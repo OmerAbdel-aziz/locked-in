@@ -1,13 +1,15 @@
 /*
- * The focus screen — Task 7.
+ * The focus screen — Tasks 7 + 10.
  *
- * The left column is now the live Timer Engine (ring, readout, controls)
- * bound to the store, and the header tabs switch the engine's phase. Layout
- * follows the two-column composition in `docs/design/code.html` — a 12-column
- * grid split 7/5 (ADR-004) — so column placement matches `screen.png`.
+ * The left column is the live Timer Engine (ring, readout, controls) bound to
+ * the store, and the header tabs switch the engine's phase. The right column
+ * is now the live "Today's Focus" panel (Task 10): create, complete and
+ * reorder against Convex. Layout follows the two-column composition in
+ * `docs/design/code.html` — a 12-column grid split 7/5 (ADR-004) — so column
+ * placement matches `screen.png`.
  *
  * Still scaffolding, replaced by their own tasks:
- *   - the right column's demo tasks (Task 10) and summary bento (Task 12)
+ *   - the summary bento (Task 12, which derives it from the session log)
  *   - the active-task card, which sits under the controls (Task 12; it needs
  *     a bound active task, which is Task 11)
  *   - the streak pill (Task 15, which derives it from the session log)
@@ -20,12 +22,7 @@
 
 import { ModeTabs } from "@/components/timer/mode-tabs";
 import { TimerEngine } from "@/components/timer/timer-engine";
-
-const DEMO_TASKS = [
-  { title: "Finalize Q2 pitch deck", leaves: "4/8", done: false, active: true },
-  { title: "Morning inbox zero", leaves: "1/1", done: true, active: false },
-  { title: "Review architectural diagrams", leaves: "0/2", done: false, active: false },
-] as const;
+import { TaskPanel } from "@/components/tasks/task-panel";
 
 export default function Page() {
   return (
@@ -49,47 +46,10 @@ export default function Page() {
           <TimerEngine />
         </div>
 
-        {/* Right column — Editorial Bento (demo data until Tasks 10 + 12). */}
+        {/* Right column — the live task panel (Task 10) above the summary
+            bento (still demo data until Task 12). */}
         <div className="col-span-12 space-y-8 lg:col-span-5">
-          <section>
-            <div className="mb-6 flex items-end justify-between">
-              <h2 className="text-2xl font-bold tracking-tight text-on-surface">
-                Today&apos;s Focus
-              </h2>
-              <span className="font-mono text-xs text-on-surface-variant">
-                3 / 8 COMPLETED
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {DEMO_TASKS.map((task) => (
-                <div
-                  key={task.title}
-                  className={`rounded-xl p-4 transition-colors ${
-                    task.active
-                      ? "border-l-2 border-primary bg-surface-container-low/50"
-                      : "bg-surface-container-low/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-sm font-medium ${
-                        task.done
-                          ? "text-on-surface-variant line-through"
-                          : "text-on-surface"
-                      }`}
-                    >
-                      {task.title}
-                    </span>
-                    <span className="font-mono text-[10px] text-on-surface-variant">
-                      {task.leaves}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
+          <TaskPanel />
           {/* Summary bento — passive readouts, no gate, no celebration. */}
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl bg-surface-container-low p-6">
