@@ -22,6 +22,7 @@ import { TimerEngine } from "@/components/timer/timer-engine";
 import { ProgressCard } from "@/components/tasks/progress-card";
 import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
+import { StatusFooter } from "@/components/chrome/status-footer";
 
 export default function Page() {
   return (
@@ -41,25 +42,30 @@ export default function Page() {
 
       <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-12 gap-12 px-8 pb-20 pt-24">
         {/* Left column — Timer Engine (live since Task 7) with the
-            active-task card beneath its controls (Task 12). */}
-        <div className="col-span-12 flex flex-col items-center justify-center lg:col-span-7">
+            active-task card beneath its controls (Task 12).
+            `min-w-0`: grid/flex items refuse to shrink below their content
+            otherwise, and the ring column overflowed 390px viewports
+            (audit 2026-10-16). */}
+        <div className="enter col-span-12 flex min-w-0 flex-col items-center justify-center lg:col-span-7">
           <TimerEngine />
           <ProgressCard />
         </div>
 
         {/* Right column — the live task panel (Task 10) above the live
-            summary bento (Task 12). */}
-        <div className="col-span-12 space-y-8 lg:col-span-5">
-          <TaskPanel />
+            summary bento (Task 12). Entrances stagger after the engine. */}
+        <div className="col-span-12 min-w-0 space-y-8 lg:col-span-5">
+          <div className="enter enter-1">
+            <TaskPanel />
+          </div>
           {/* Summary bento — passive readouts, no gate, no celebration. */}
-          <SummaryBento />
+          <div className="enter enter-2">
+            <SummaryBento />
+          </div>
         </div>
       </main>
 
-      <footer className="flex items-center justify-between px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-        <span>Locked In Status: Ready</span>
-        <span className="font-mono">Local Time: 14:00</span>
-      </footer>
+      {/* Live footer chrome (PRD §4.1): real local time + connection. */}
+      <StatusFooter />
     </div>
   );
 }

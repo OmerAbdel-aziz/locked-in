@@ -43,6 +43,30 @@ vi.mock("@convex-dev/auth/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
 }));
 
+/*
+ * HeroUI's Tabs measure overflow with a ResizeObserver (via its
+ * scroll-shadow), which jsdom does not implement. The tabs under test never
+ * overflow, so an inert stub is faithful: it only removes the measuring the
+ * test never exercises.
+ */
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+/*
+ * HeroUI's Tabs.Indicator animates with the View-Transition-flavoured
+ * SharedElementTransition, which reads `element.getAnimations()` — absent in
+ * jsdom. The indicator's motion is a browser concern (Playwright, Task 27);
+ * returning no running animations is the faithful headless answer.
+ */
+if (typeof Element !== "undefined" && !Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = () => [];
+}
+
 const MIN = 60_000;
 
 beforeEach(() => {
@@ -73,9 +97,9 @@ function allClasses(node: HTMLElement): string[] {
 
 describe("the progress ring matches the design's geometry", () => {
   it("uses the design's radius, stroke width and -90deg rotation", () => {
-    // `code.html`: r="48%", stroke-width="4", transform -rotate-90, in a
-    // container sized max-w-md (448px). The viewBox is 448 units precisely
-    // so that stroke-width 4 renders as the 4px the design specifies.
+    // `code.html`: r="48%", stroke-width="4", transform -rotate-90. The
+    // viewBox is 448 units so the ratios are the design's; the display cap
+    // is max-w-xs (audit 2026-10-16), so absolute px scales with width.
     const { container } = render(<ProgressRing variant="idle" progress={0} />);
     const svg = container.querySelector("svg");
 
@@ -185,8 +209,10 @@ describe("the progress ring matches the design's geometry", () => {
     // definite width on the item itself it resolves against its own content
     // — the digits — and the circle collapses to the width of the face. It
     // did exactly that before this fix, which is why the assertion is on the
-    // section rather than the ring.
-    expect(section.className).toContain("max-w-md");
+    // section rather than the ring. Capped at max-w-xs (audit 2026-10-16:
+    // the 448px ring dominated even large screens); the SVG viewBox stays
+    // 448 units so every geometry ratio is bit-identical.
+    expect(section.className).toContain("max-w-xs");
     expect(ringWrapper?.className).toMatch(/aspect-square/);
     // …and the readout sizes itself to that ring via container query units.
     expect(ringWrapper?.className).toContain("@container");
@@ -327,7 +353,7 @@ describe("the engine is wired to the store", () => {
     // Now on a short break, still owing session 1.
     expect(useTimerStore.getState().state.cyclePosition).toBe(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Long Break" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Long Break" }));
 
     const { phase, cyclePosition, status } = useTimerStore.getState().state;
     // Selecting a tab is neither completion nor skip.
@@ -346,7 +372,9 @@ describe("the engine is wired to the store", () => {
     ];
 
     for (const [tab, cta] of tabs) {
-      fireEvent.click(screen.getByRole("button", { name: tab }));
+      // HeroUI Tabs carry the tab role (React Aria); they are still the
+      // mode switch Task 7's buttons were, only in the library's markup.
+      fireEvent.click(screen.getByRole("tab", { name: tab }));
       expect(screen.getByRole("button", { name: cta })).toBeTruthy();
     }
   });

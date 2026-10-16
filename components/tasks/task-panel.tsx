@@ -21,6 +21,9 @@
  *   - `activeTask` — PRD §4.1's `activeTaskId`, which draws the green rail.
  *     Clicking a row re-points it, and the same selection is handed to the
  *     timer below so a phase binds it at start (D8).
+ *   - `projects.list` — the names behind the row's project tags, the picker's
+ *     options, and the filter's chips (Task 13). Joined in `toTaskRows`, so
+ *     the list component still never joins anything itself.
  *
  * One field still arrives stubbed: `projectName`, because there are no
  * projects until Task 13. The tag itself is built and tested today because
@@ -31,14 +34,23 @@
  * `resolveOwner` — rightly — refuses a call with no identity behind it, and
  * a first-time visitor reaches the page several hundred milliseconds before
  * their identity does.
+ *
+ * Below the list sit the projects' own surfaces: the CRUD manager and, while
+ * a project filter is selected, that project's derived overview (Tasks 13 +
+ * 14). The filtered list above the overview doubles as the overview's task
+ * list, so the card carries only the numbers.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useTimerStore, type ActiveTask } from "@/lib/store/timer";
+import { ProjectFilter } from "@/components/projects/filter";
+import { ProjectManager } from "@/components/projects/project-manager";
+import { ProjectOverview } from "@/components/projects/overview";
 
 import { TaskList, type TaskRow } from "./task-list";
 
@@ -54,6 +66,8 @@ export interface TaskFields<Id extends string = string> {
   title: string;
   estimate: number;
   activeFlag: boolean;
+  /** The project the task is filed under, when one is assigned (Task 13). */
+  projectId?: string;
 }
 
 /**
@@ -61,13 +75,15 @@ export interface TaskFields<Id extends string = string> {
  *
  * Open rows first, then finished: `list` already returns them that way, and
  * restating it here means a change to the query's shape lands in one place.
- * The two facts a bucket cannot carry — which task is selected and how many
- * focus sessions each has — are matched in here so a row is derived in a
- * single pass and the list component never has to join anything itself.
+ * The facts the buckets cannot carry — which task is selected, how many
+ * focus sessions each has, and what its project is called — are matched in
+ * here so a row is derived in a single pass and the list component never
+ * has to join anything itself.
  *
- * Both are deliberately optional: `isActive` false and `completedLeaves` 0
- * are exactly what the panel shows while the queries are still settling, so
- * the default is the honest "nothing yet" rather than a placeholder.
+ * All three are deliberately optional: `isActive` false, `completedLeaves`
+ * 0 and an untagged row are exactly what the panel shows while the queries
+ * are still settling, so the default is the honest "nothing yet" rather
+ * than a placeholder.
  */
 export function toTaskRows<Id extends string>(
   buckets: {
@@ -79,19 +95,31 @@ export function toTaskRows<Id extends string>(
     activeTaskId?: Id | null;
     /** Focus-session counts keyed by task id; a missing key reads as `0`. */
     leaves?: Readonly<Record<string, number>>;
+    /**
+     * The owner's projects keyed by id (Task 13). Absent while the list
+     * query settles — and every row then reads as untagged, the same honest
+     * default the panel has always shown, rather than a name on its way.
+     */
+    projects?: Readonly<Record<string, { name: string; archived: boolean }>>;
   } = {},
 ): TaskRow<Id>[] {
-  const { activeTaskId = null, leaves = {} } = options;
+  const { activeTaskId = null, leaves = {}, projects = {} } = options;
 
-  return [...buckets.active, ...buckets.completed].map((task) => ({
-    id: task._id,
-    title: task.title,
-    estimate: task.estimate,
-    done: !task.activeFlag,
-    completedLeaves: leaves[String(task._id)] ?? 0,
-    isActive: activeTaskId !== null && task._id === activeTaskId,
-    projectName: null,
-  }));
+  return [...buckets.active, ...buckets.completed].map((task) => {
+    const projectId = task.projectId ?? null;
+    const project = projectId === null ? undefined : projects[projectId];
+    return {
+      id: task._id,
+      title: task.title,
+      estimate: task.estimate,
+      done: !task.activeFlag,
+      completedLeaves: leaves[String(task._id)] ?? 0,
+      isActive: activeTaskId !== null && task._id === activeTaskId,
+      projectId,
+      projectName: project?.name ?? null,
+      projectArchived: project?.archived ?? false,
+    };
+  });
 }
 
 export function TaskPanel() {
@@ -127,6 +155,11 @@ export function TaskPanel() {
   );
   const leaves = useQuery(api.tasks.leafCounts, isAuthenticated ? {} : "skip");
 
+  // The projects behind the picker, the filter and the tag (Task 13). Same
+  // gate: it resolves an owner like every other query on this panel, so it
+  // skips with them rather than failing without them.
+  const projects = useQuery(api.projects.list, isAuthenticated ? {} : "skip");
+
   const create = useMutation(api.tasks.create);
   const complete = useMutation(api.tasks.complete);
   const uncomplete = useMutation(api.tasks.uncomplete);
@@ -139,6 +172,9 @@ export function TaskPanel() {
   // — the one place holding both the id and the project the task is filed
   // under. From then on the store snapshots it when a phase begins, which is
   // what makes D8's "bound at start" possible without a network call.
+  // (`task.projectId` below is the full document's field, not the
+  // `TaskFields` narrow type `toTaskRows` takes — the query returns whole
+  // rows, and the snapshot needs the real filing, not the display default.)
   const setActiveTask = useTimerStore((s) => s.setActiveTask);
 
   useEffect(() => {
@@ -163,6 +199,57 @@ export function TaskPanel() {
     setActiveTask(selection);
   }, [rows, activeTaskId, setActiveTask]);
 
+  // The list filter and the add pill's picker (Task 13). Selecting a chip
+  // filters the list *and* arms the picker with that project, so a task
+  // created while viewing a project lands in it; the picker stays freely
+  // changeable afterwards, and "All" lifts the filter without touching the
+  // picker's choice. Both are plain client state — no server round trip, no
+  // persisted preference.
+  const [filterProjectId, setFilterProjectId] =
+    useState<Id<"projects"> | null>(null);
+  const [pickerProjectId, setPickerProjectId] =
+    useState<Id<"projects"> | null>(null);
+
+  // The index the rows join against: id → what the tag prints and whether
+  // it prints muted. Absent until the query settles, which `toTaskRows`
+  // reads as "no project names yet" rather than as empty names.
+  const projectIndex: Record<string, { name: string; archived: boolean }> = {};
+  const activePickerProjects: { id: Id<"projects">; name: string }[] = [];
+  const filterProjects: { id: string; name: string; archived: boolean }[] = [];
+  if (projects !== undefined) {
+    for (const project of projects.active) {
+      projectIndex[project._id] = { name: project.name, archived: false };
+      activePickerProjects.push({ id: project._id, name: project.name });
+      filterProjects.push({
+        id: project._id,
+        name: project.name,
+        archived: false,
+      });
+    }
+    for (const project of projects.archived) {
+      projectIndex[project._id] = { name: project.name, archived: true };
+      // Archived projects keep a filter chip (muted) but never a picker
+      // option — see `picker.tsx` for why the two differ.
+      filterProjects.push({
+        id: project._id,
+        name: project.name,
+        archived: true,
+      });
+    }
+  }
+
+  const allRows: TaskRow<Id<"tasks">>[] =
+    rows === undefined
+      ? []
+      : toTaskRows(rows, { activeTaskId, leaves, projects: projectIndex });
+  // The filter is display-only: it hides rows, never unloads them, so the
+  // header count reads for the view in front of the user and the selection
+  // (which may point at a now-hidden row) is untouched.
+  const visibleRows =
+    filterProjectId === null
+      ? allRows
+      : allRows.filter((row) => row.projectId === filterProjectId);
+
   function failed(what: string, error: unknown) {
     // A row the user believes exists but that never landed is worse than a
     // loud failure: the list is the only surface that shows it. Same stance
@@ -171,54 +258,86 @@ export function TaskPanel() {
   }
 
   return (
-    <TaskList
-      // An empty list rather than nothing while the identity is settling, so
-      // the column does not jump when the data lands. `activeTaskId` and
-      // `leaves` may each still be `undefined`, which `toTaskRows` reads as
-      // "nothing selected yet / no sessions yet" — the same honest default
-      // the panel has always shown while a query settles.
-      tasks={
-        rows === undefined
-          ? []
-          : toTaskRows(rows, { activeTaskId, leaves })
-      }
-      // Nothing here is queued: a write issued before the session exists is
-      // refused by the server, so the only honest options are "refuse the
-      // read" (above) and "refuse the control" (below).
-      ready={isAuthenticated}
-      onCreate={(title, estimate) => {
-        void create({ title, estimate }).catch((error) =>
-          failed("create the task", error),
-        );
-      }}
-      onToggle={(id, next) => {
-        const call = next ? complete : uncomplete;
-        void call({ taskId: id }).catch((error) =>
-          failed("update the task", error),
-        );
-      }}
-      onReorder={(taskId, afterId, beforeId) => {
-        void reorder({ taskId, afterId, beforeId }).catch((error) =>
-          failed("reorder the task", error),
-        );
-      }}
-      onClearCompleted={() => {
-        void clearCompleted({}).catch((error) =>
-          failed("clear completed tasks", error),
-        );
-      }}
-      onSelect={(id) => {
-        // Clicking the row that is *already* selected clears it. PRD §4.1
-        // defines clicking as selecting and says nothing about unselecting,
-        // but a selection with no way back would attribute every future
-        // session to whatever was last clicked, with the green rail as the
-        // only sign it was still armed. Completed rows stay selectable, and
-        // once selected they stay selected until another is chosen (Task 11).
-        const next = id === activeTaskId ? null : id;
-        void selectTask({ taskId: next }).catch((error) =>
-          failed("change the active task", error),
-        );
-      }}
-    />
+    <>
+      <ProjectFilter
+        projects={filterProjects}
+        value={filterProjectId}
+        onChange={(id) => {
+          setFilterProjectId(id as Id<"projects"> | null);
+          // Arming the picker with the project just opened: creating while
+          // viewing a project files there. Lifting the filter ("All") leaves
+          // the picker's choice alone — unfiltering must not disarm it.
+          if (id !== null) {
+            setPickerProjectId(id as Id<"projects">);
+          }
+        }}
+      />
+      <TaskList
+        // An empty list rather than nothing while the identity is settling, so
+        // the column does not jump when the data lands. `activeTaskId` and
+        // `leaves` may each still be `undefined`, which `toTaskRows` reads as
+        // "nothing selected yet / no sessions yet" — the same honest default
+        // the panel has always shown while a query settles.
+        tasks={visibleRows}
+        // Nothing here is queued: a write issued before the session exists is
+        // refused by the server, so the only honest options are "refuse the
+        // read" (above) and "refuse the control" (below).
+        ready={isAuthenticated}
+        projects={activePickerProjects}
+        pickerProjectId={pickerProjectId}
+        // Wrapped rather than passed raw: the state setter accepts a
+        // functional update the picker must never be handed.
+        onPickerProjectChange={(id) =>
+          setPickerProjectId(id as Id<"projects"> | null)
+        }
+        onCreate={(title, estimate, projectId) => {
+          // The list hands over strings; the mutation wants the branded id.
+          // The cast is safe because the only strings that reach here are
+          // ids the server's own `projects.list` returned — and the mutation
+          // re-proves ownership before writing anything under them.
+          const picked = (projectId ?? pickerProjectId ?? undefined) as
+            | Id<"projects">
+            | undefined;
+          void create({ title, estimate, projectId: picked }).catch((error) =>
+            failed("create the task", error),
+          );
+        }}
+        onToggle={(id, next) => {
+          const call = next ? complete : uncomplete;
+          void call({ taskId: id }).catch((error) =>
+            failed("update the task", error),
+          );
+        }}
+        onReorder={(taskId, afterId, beforeId) => {
+          void reorder({ taskId, afterId, beforeId }).catch((error) =>
+            failed("reorder the task", error),
+          );
+        }}
+        onClearCompleted={() => {
+          void clearCompleted({}).catch((error) =>
+            failed("clear completed tasks", error),
+          );
+        }}
+        onSelect={(id) => {
+          // Clicking the row that is *already* selected clears it. PRD §4.1
+          // defines clicking as selecting and says nothing about unselecting,
+          // but a selection with no way back would attribute every future
+          // session to whatever was last clicked, with the green rail as the
+          // only sign it was still armed. Completed rows stay selectable, and
+          // once selected they stay selected until another is chosen (Task 11).
+          const next = id === activeTaskId ? null : id;
+          void selectTask({ taskId: next }).catch((error) =>
+            failed("change the active task", error),
+          );
+        }}
+      />
+      {/* The projects' own CRUD surface (Task 13) and the selected
+          project's derived overview (Task 14): the filtered list above is
+          the overview's task list, so the card carries only the numbers. */}
+      <ProjectManager />
+      {filterProjectId === null ? null : (
+        <ProjectOverview projectId={filterProjectId} />
+      )}
+    </>
   );
 }

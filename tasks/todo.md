@@ -324,27 +324,131 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 
 ---
 
-## Phase 4: Projects vertical
+## Phase 3.5: HeroUI migration + typeface + theme scaffolding
+
+**Why this phase exists (PRD D6a/D6b/D6c, revised 2026-10-16):** the app currently uses zero component libraries and a dark-only, mono/Inter design. Before Projects builds anything new, the foundation moves to HeroUI v3 so nothing is built twice, and the typeface + theme groundwork lands early.
+
+**The three themes are already specified** — see `docs/design/heroui-themes.css` (committed; the three `temp.css` palettes, each with light + dark, in HeroUI's own `data-theme` token vocabulary). Phase 3.5b ports them; it does not invent them.
+
+**The build-from-scratch rule (D6a):** if HeroUI ships the component, use it. Hand-written is permitted for exactly two things — the **drag-and-drop task list** (HeroUI has no DnD; Task 10's hand-rolled HTML5 stays) and **glass/gradient surface styling** (CSS, not a component). Everything else — buttons, tabs, inputs, checkboxes, cards, modals, the project picker (Task 13) and filter chips — comes from HeroUI.
+
+**HeroUI's fit is good, not a fight:** it is built on **Tailwind v4 + React 19** — this repo's exact stack — and uses standalone `@heroui/styles` CSS with BEM classes (no className threading) plus React Aria for accessibility. No className-vs-BEM war to fight.
+
+### Task 13.5a: Install HeroUI + repoint the typeface
+**Description:** `@heroui/react` + `@heroui/styles` installed; the `@import "@heroui/styles"` line added to `globals.css`; the three `shadcn/ui` references in `docs/prd.md` already changed to HeroUI. Then **all-JetBrains-Mono** (D6c): repoint `--font-sans`, `--font-mono`, `--font-headline`, `--font-body`, `--font-label` at `var(--font-jetbrains)` (already self-hosted via `next/font`), drop the Inter import from `layout.tsx`, and update `docs/design/typography.md` to record the superseded mono/Inter pairing. JetBrains Mono is already loaded — this is a token repoint, not a font add.
+**Acceptance:**
+- [x] HeroUI installed; `@heroui/styles` imported; dev server, `tsc`, lint clean
+- [x] No Inter anywhere; every font token resolves to JetBrains Mono
+- [x] `docs/design/typography.md` records that mono/Inter is superseded
+**Dependencies:** Task 12 (current foundation)
+**Files:** package.json, app/globals.css, app/layout.tsx, docs/design/typography.md
+**Scope:** S
+
+**Deviations:**
+1. **`tailwind-variants` installed alongside** — `@heroui/react`'s peer dependency; the install is incomplete without it.
+2. **JetBrains Mono gains weight 400** — body copy now sets in Mono and needs a text weight; the loader previously carried only 500/700. The `--font-jetbrains` variable name is kept so CSS tokens repoint without renaming.
+3. **`docs/design/typography.md` created, not updated** — it did not exist; the task's "update" is its first revision, recording the supersession.
+
+### Task 13.5b: Theme scaffolding (light/dark + three palettes)
+**Description:** port the three themes — Mint (default, hue 155°), Airbnb (17°), Rabbit (36.66°), each with a **light and a dark** variant — from `docs/design/heroui-themes.css` (committed; the source-of-truth copy of the root's `temp.css`) into `globals.css` as HeroUI `data-theme` tokens (D6b). Make the CTA gradient **theme-aware**: each theme supplies its own two-stop gradient (accent + darker sibling) as a token, keeping the fixed `145°` geometry. Wire `--font-sans`/`--font-mono` at JetBrains Mono so the themes' own `--font-sans` tokens (which reference Inter) are overridden. Theme *switching UI* is Phase 5 — this task is the token groundwork only.
+**Acceptance:**
+- [x] Three themes × light/dark resolve via `data-theme`
+- [x] CTA gradient is a per-theme token at fixed `145°`
+- [x] `--font-sans`/`--font-mono` point at JetBrains Mono, overriding the themes' Inter reference
+- [x] DESIGN.md's dark-only `#131313` body and its "no pure white" rule are both marked **STALE** (done in the design doc); the `timer-ui`/`tasks-ui` DOM tests that enforced them are **re-derived for light/dark** — the no-pure-white rule is relaxed in light mode, kept for the dark themes
+**Dependencies:** Task 13.5a
+**Files:** app/globals.css, docs/design/DESIGN.md, docs/design/heroui-themes.css, tests/timer-ui.test.tsx, tests/tasks-ui.test.tsx
+**Scope:** M
+
+**Deviations:**
+1. **Selectors namespaced per palette** — the source repeats `:root/.light/.default/[data-theme="light"]` for all three palettes, which would collapse into one cascade. Each palette resolves under its own name (`mint`, `airbnb`, `rabbit` + `-dark`); `:root` carries mint-light per HeroUI convention, `layout.tsx` sets `data-theme="mint-dark"` so first paint stays the dark product, and `[data-theme="dark"]`/`.dark` alias mint-dark.
+2. **CTA darker siblings invented, values recorded in `globals.css`** — the source palettes ship no gradient stops. Each theme gets `--cta-from` (its accent) + `--cta-to` (darker sibling: mint 66%/0.14, airbnb 54%/0.21, rabbit 55%/0.20) at the fixed `145°`; the legacy primaries are the pre-theme fallback.
+3. **Legacy 47-token `@theme` kept verbatim** — components repoint slice by slice in 13.5c/d, so the old utilities keep resolving until their owners migrate. The design-tokens gate still pins all 47 hexes; only the body/root/light-mode assertions were re-derived for the supersession.
+4. **No-white DOM gates kept unconditional (stricter than the STALE note requires)** — the note relaxes the rule in light mode, but the assertions check literal hex/white utilities in markup, and no theme introduces any: light surfaces are oklch tokens, invisible to those assertions. Nothing needed relaxing; computed light surfaces are a browser-pass concern (Checkpoint B2).
+5. **Known collision: `bg-background` / `bg-surface` utilities still resolve to legacy hexes** — both `@theme` blocks define `--color-background`/`--color-surface`, and the legacy block wins its collisions. Theme-awareness flows through direct `var(--background)`/`var(--surface)` references (body, CTA, glass, and all HeroUI component internals), never through the colliding utilities. Do not use those two utilities for theme-aware surfaces until the legacy `@theme` retires in a later phase.
+6. **`temp.css` deleted** — `docs/design/heroui-themes.css` remains the committed source of truth.
+
+### Task 13.5c: Rewrite the timer onto HeroUI
+**Description:** CTA + Reset/Skip → **Button**; Focus/Short/Long tabs → **Tabs**; progress ring → **ProgressCircle** *if* its determinate API reproduces the design's 448-viewBox / r 48% / 4px-stroke / `-rotate-90` / round-cap geometry — else keep the hand-written SVG (geometry beats library, and the ring is the app's focal element). Re-derive the `timer-ui` DOM assertions against the new markup; keep every rule that still holds (no pure white, no sectioning borders, round caps, gradient-from-same-`remainingMs`).
+**Acceptance:**
+- [x] Ring geometry bit-identical to the design package, whichever implementation wins
+- [x] No pure white; no 1px sectioning borders; CTA gradient intact
+- [x] `tests/timer-ui.test.tsx` green against the HeroUI markup
+**Dependencies:** Task 13.5a, Task 13.5b
+**Files:** components/timer/*, tests/timer-ui.test.tsx
+**Scope:** M
+
+**Deviations:**
+1. **Ring kept hand-written (geometry beats library, documented in `progress-ring.tsx`)** — ProgressCircle's custom-SVG props *can* reproduce the viewBox/r/stroke, but its `color`-per-instance model has no equivalent for the idle-full-muted vs. running-gradient vs. paused-muted-arc three-state semantics, the gradient def + 10%-opacity track are custom SVG either way, and its min/max/value model fights the 0..1 elapsed fraction. All six ring geometry tests unchanged.
+2. **Handlers through `onPress` only** — wiring both `onPress` and `onClick` double-fires on a mouse click (probed). `fireEvent.click` fires `onPress`, so the store tests drive the visitor's path.
+3. **Tabs need two jsdom stubs** (`ResizeObserver`, `Element.getAnimations`) — both are browser-only measuring/animation; the stub block in `timer-ui.test.tsx` records why each is faithful. Tab queries re-derived from `button` to `tab` role (React Aria).
+
+### Task 13.5d: Rewrite tasks, card + bento onto HeroUI
+**Description:** task input → **TextField**/**Input**; row checkbox → **Checkbox**; **TaskList/TaskItem keep the hand-rolled HTML5 DnD** (HeroUI ships none) but their *surfaces* adopt HeroUI tokens; progress card + summary bento → **Card**/**Surface** with theme-aware tokens. Re-derive `tasks-ui` assertions; the drag algebra (`lib/task-order.ts`, pure) is untouched — only the DOM that hosts it changes.
+**Acceptance:**
+- [x] Card/bento ghost borders and the divider rules still hold under the new markup
+- [x] Focus Score stays a passive `text-primary` readout at every value
+- [x] DnD still works; `tests/tasks-ui.test.tsx` green
+**Dependencies:** Task 13.5c
+**Files:** components/tasks/*, tests/tasks-ui.test.tsx
+**Scope:** M
+
+**Deviations:**
+1. **Leaf 0–8 selector stays a native `<select>`** — HeroUI ships no compact number-picker; a full Select dropdown for nine single digits would be chrome the design never asked for. Only the text field moved to TextField/Input.
+2. **Checkbox stopPropagation moved to a wrapper `<span>`** — independent of HeroUI's internal slot structure; the row's keyboard guard (`event.target !== currentTarget`) is untouched.
+3. **Indicator uses a render function, not static children** — static `null` children fall through to HeroUI's default checkmark SVG (read in `node_modules/@heroui/react/dist/components/checkbox/checkbox.js`), leaving a hidden-but-present mark in every unchecked box.
+4. **Bare-border affordance test re-derived** — HeroUI's `checkbox__control` carries the `border` class instead of a `role="checkbox"` button; the assertion now accepts both shapes.
+5. **Row/bento/card surfaces keep legacy token classes** — Card shells carry the ghost border + tonal fill as classes (so the divider/ghost assertions hold verbatim); a full legacy→HeroUI token remap waits on the legacy `@theme` retirement (see 13.5b deviation 5). `lib/task-order.ts` untouched.
+
+**Checkpoint B2:** whole app on HeroUI + all-mono + both modes of a theme rendering. Full gate (tests, lint, `tsc`, build) + browser pass in light *and* dark. Review with human.
+
+**Audit follow-up (2026-10-16, taste-skill audit-only pass):** applied immediately per human instruction.
+1. **Ring minimized** — engine/controls/progress-card measure dropped `max-w-md` → `max-w-xs` (320px display; SVG viewBox stays 448 units, ratios bit-identical). Timer-ui width pin re-derived.
+2. **Mobile overflow fixed** — grid columns + engine/controls carry `min-w-0` so the ring column no longer bleeds off 390px viewports.
+3. **HeroUI tab-track border removed** — the secondary variant's full-width `border-b` on `.tabs__list-container` violated the no-line rule; overridden in `globals.css` (gated in design-tokens tests). The active-tab indicator stays.
+4. **Empty-list guidance** — one calm line while the board is empty; leaves with the first task (gated both ways).
+5. **Live footer** — `components/chrome/status-footer.tsx`: real local time (1s tick) + online/offline indicator replace the placeholders (Task 26 precursor, gated in `tests/status-footer.test.tsx`). Mount-gated for the prerender rule.
+6. **Entrance motion** — staggered `.enter`/`.enter-1..3` rise at sanctuary easing, pure CSS with `prefers-reduced-motion` fallback (gated for presence + fallback).
+7. **Meter FAILs rejected with cause** — gradient CTA, glass, all-mono, micro-labels, zero pictures/footage are DESIGN.md/PRD bindings for a tool, not a story page; shadow FAILs are zero-alpha HeroUI base styles (meter noise). `lint.mjs` could not run (Windows path resolution); `inspect.mjs` ran clean at 1440/768/390.
+
+---
 
 ### Task 13: Project CRUD + picker/filter
 **Description:** projects create/rename/archive + list query (100-active cap); project picker in task create/edit; task-list filter chips (All / project). Archived = muted tag, tasks keep attribution.
 **Acceptance:**
-- [ ] Archive never deletes or rewrites tasks/sessions; archived projects hidden from picker but shown muted on tasks
-- [ ] Cap enforced with a friendly error at 100 active
+- [x] Archive never deletes or rewrites tasks/sessions; archived projects hidden from picker but shown muted on tasks
+- [x] Cap enforced with a friendly error at 100 active
 **Verification:** Integration tests incl. archive-then-session-attribution check.
 **Dependencies:** Task 9
 **Files:** convex/projects.ts, components/projects/picker.tsx, components/projects/filter.tsx, tests/projects.test.ts
 **Scope:** M
 
+**Deviations:**
+
+1. **Plus `unarchive` and the CRUD surface, minus the edit-form picker** — `unarchive` restores an archived project under the same 100-active cap (an archive with no way back is a one-way trap; a mis-tap would orphan tasks from every picker). The CRUD lives in `components/projects/project-manager.tsx` (create input + inline rename + archive/restore, cap refusal in `tertiary`) beneath the task list. There is no *edit-form* picker because no task-edit UI exists yet (Task 10 built create/toggle/reorder only) — the picker rides the add pill; `tasks.update` already accepts `projectId` rebinding (tested Task 9), so the mutation path is ready when an edit form lands.
+2. **Filter chips include archived projects (muted), the picker excludes them** — the acceptance criterion's split, made explicit: hiding an archived chip would strand its still-boarded tasks with no way to isolate them, while offering an archived project as a *new-task destination* would birth tasks under a muted tag.
+3. **Selecting a chip arms the picker with that project** — creating while viewing a project files there; "All" lifts the filter without disarming the picker. Both are unpersisted client state.
+4. **Names are not deduped at creation** — two projects may share a name; Task 24's merge unions them case-insensitively. Refusing duplicates at creation would make the merge's job ambiguous.
+
+**Gate** (`tests/projects.test.ts`, 20 tests): blank/over-long names, trim, 100-active cap (+ archive frees a slot), rename rules, archive idempotency, the acceptance test (task + session read back field-identical after archive), cross-tenant refusal matrix, unauthenticated refusal of all six functions. `tests/projects-ui.test.tsx` (24 tests) pins the chips/picker/manager gestures, the `toTaskRows` id→name+muted join, and the no-white/no-line rules on the new surfaces. The panel-gate test in `tasks-ui.test.tsx` now expects five subscriptions (the panel's `projects.list` plus the manager's own).
+
 ### Task 14: Project overview panel
 **Description:** Project view (route or large drawer): name, open/done task counts, estimated vs. completed leaves, focus time from sessions, its task list — all derived.
 **Acceptance:**
-- [ ] Focus time comes from session log filtered by `projectId` snapshot (renames don't affect history)
-- [ ] Empty project shows calm empty state (no fabricated numbers)
+- [x] Focus time comes from session log filtered by `projectId` snapshot (renames don't affect history)
+- [x] Empty project shows calm empty state (no fabricated numbers)
 **Verification:** Manual with seeded sessions; aggregation test.
 **Dependencies:** Task 13, Task 19's aggregation helpers may be reused — implement inline here if Task 19 not yet done
 **Files:** app/projects/[id]/page.tsx (or components/projects/overview.tsx), convex/projects.ts
 **Scope:** M
+
+**Deviations:**
+
+1. **Panel, not a route** — `components/projects/overview.tsx` renders beneath the list while a project filter is selected, so the filtered list *is* the overview's task list and the card carries only the numbers. A route would need navigation chrome the design has no slot for; deep-linking can revisit this when `/stats` lands.
+2. **No new aggregation helpers from Task 19** — implemented inline in `projects.overview` (per-task index for counts/estimates, bounded owner-log scan filtered by `projectId` snapshot for focus time/leaves). Task 19 may factor a shared helper when the stats surface lands.
+3. **Breaks never count** — focus time and completed leaves sum focus phases only, the same reading `todaySummary` uses, so the two can never disagree about what "focus time" means.
+
+**Gate:** `overview` cases in `tests/projects.test.ts` (derivation incl. break exclusion, rename survival, archive survival, empty-project zeros, foreign/unauthenticated refusal) + view cases in `tests/projects-ui.test.tsx` (one-decimal hours, Archived badge, calm empty state, no-line rule).
 
 **Checkpoint D:** project flows working. Review with human.
 
@@ -538,4 +642,6 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 | 10 | done | `components/tasks/*` + `lib/task-order.ts` + `app/page.tsx` — the right column is live against Convex. Presentational `TaskList`/`TaskItem`/`TaskInput` (props + callbacks, generic over `<Id extends string>` so the query's `Id<"tasks">` needs no cast) with `task-panel.tsx` as the only file that touches `convex/react`; drop algebra is pure and lives in `lib/task-order.ts`, so it is proved without a DOM (jsdom has no layout — rectangles are stubbed in the component, the *decision* is tested separately). DnD is hand-rolled HTML5 rather than a dependency, per §9's "ask first". **The browser pass found a bug that ran three tasks deep: every authenticated call in the app has been failing since Task 4.** The symptom arrived as `resolveOwner: unauthenticated callers have no owner`, which reads like a client-side race, so the first fix gated the query on the session and gated the add pill too (both kept — they are correct independently). It was neither: `signIn("anonymous")` succeeded, the token was issued, stored in the browser, and `useConvexAuth` reported `true`, and only the first call *needing* the session proved it never reached the server. Task 4 shipped `convex/auth.ts` but not `convex/auth.config.ts` — and the package's init writes both, plus a key step that sets `JWT_PRIVATE_KEY`/`JWKS`. Three symptoms in sequence (`resolveOwner` refusing → `AuthError: no providers configured` → a 1013 `AuthProviderDiscoveryFailed` reconnect loop, because `jwks.json` returned `500 Missing environment variable`) were one missing file and two missing env vars. Tasks 8 and 9 never saw it: their gates run against `convex-test`, which *is* the platform. **Also found:** `useConvexAuth` from `convex/react` reads the raw client's auth state, which `ConvexAuthProvider` never updates — it reads `false` forever while the auth-package hook reads `true` at t+5s — so the panel deliberately imports from two modules, with the reason written down so nobody tidies it back. Gate: `tests/tasks-ui.test.tsx` (38 tests). **Browser pass**, fresh context, zero console errors: input held shut at first paint then released on identity; four creates; **dragging the first row below the third lands it third**; toggle to `1 / 4`; reload persisted with the completed row correctly sunk; clear-completed 4→3; deployment left at `0 / 0`. Lint/`tsc`/build/233 tests green. |
 | 11 | done | **Active-task ↔ session binding, live end-to-end.** Schema: `users.activeTaskId` (§9-approved, gated by `tests/convex-schema.test.ts`). Selection = `activeTask` query + `selectTask` mutation (click a selected row to clear; checkbox `stopPropagation`; `tabIndex` + Enter/Space + `aria-current`). Binding **captured at start**: the panel pushes `{taskId, projectId}` into the store the instant `startedAt` goes `null → number`, `complete()` logs that snapshot, and the running phase never re-reads the selection (D8). `logCompleted` now validates the bindings *before* the idempotency read (a repeat must not re-bind), tolerates a deleted task by writing the row **unbound** and repairing the pointer, and refuses a foreign task/project. `convex/lib/owner.ts` became the single home for the three ownership questions (`requireOwnedTask`/`requireOwnedProject`/`taskIfYours`). `leafCounts` derives leaves per task from `by_owner_task` + `phase === "focus"` — derived, never stored (ADR-003). **THE LIVE PASS FOUND A TIMER BUG THREE TASKS OLD:** `useCountdown` rounds *up* to the next 250 ms, so `remaining` clamped to 0 before the real clock reached `phaseEndsAt`; `usePhaseCompletion`'s dependency-gated effect asked once, was declined, and could never ask again — **the timer froze at 00:00 and no session was ever written on real time.** Fixed by making the effect deliberately un-gated (re-check every render; `completeIfDue` re-reads the clock and is idempotent), regression-tested against the old version. Gate: `tests/binding.test.ts` 21 tests + selection/derivation cases in `tests/tasks-ui.test.tsx` (incl. strengthened panel-gate tests — the generated api's property-less proxies deep-compare equal, so `toHaveBeenLastCalledWith` could not tell which query was called; all three gates are now asserted by their arguments). Mutation-tested ×2, both reverted. **Browser pass green, zero console errors, and the first successful live session write** (select A → start → click B mid-session → A 1/2, B 0/2) — closing Checkpoint B's open question. Lint/`tsc`/build/264 tests green; functions pushed to `dashing-caribou-892`. |
 | 12 | done | **Progress card + Summary bento, both derived.** `progressCard` (left column, beside the timer) answers with the selected task's title/estimate/leaf count via the shared `focusLeafCount` — the same helper `leafCounts` uses, so the card's count and the bento's ratio cannot disagree; a dead or foreign `activeTaskId` is `null`, never a borrowed stranger's task. `todaySummary` (right column, under the list) sums `completedAt − startedAt` over **focus phases only** (breaks can never count) for Today's Output, and takes Focus Score's denominator from the **current board** — sessions snapshot identity, never an estimate, so an estimate can only be read off the task as it stands. Score is `null` → "—" at a zero denominator: an empty board is no score, not a score of zero. **A test caught a real arithmetic bug in the day boundary:** `startOfLocalDay` floored the raw UTC instant *then* shifted by the device offset, which names **tomorrow's** local midnight for an early-morning instant (a UTC-5 device reading 01:00Z is living in yesterday's evening) — every afternoon case passes, only the morning boundary distinguishes the two orders, and both offsets are now pinned. `useTzOffsetMinutes` supplies the offset through `useSyncExternalStore` (Next 16 rejects clock reads in client render — same rule as Task 7). The pulsing dot is tied to "something is live", not "something is selected": an empty card shows no dot, and the bento's settling state renders zeros rather than fabricating a number. Focus Score is painted `text-primary` at **every** value — the DOM test asserts the colour does not vary with the number, which is the invariant behind "no color-coded pass/fail" (a red-for-low implementation passes every other test). Gate: `tests/summary.test.ts` 13 tests (day boundary both ways, focus-only, board denominator incl. a cleared task, dead/foreign pointer, unauthenticated, recompute-not-remembered) + new view cases in `tests/tasks-ui.test.tsx`. The page-level divider test was widened to the design's **two** sanctioned bare-`border` shapes — the checkbox affordance and `code.html`'s own ghost border on the card and tiles (`outline-variant` ≤15%, "felt rather than seen"); any other colour still fails. **Browser pass green, zero console errors, Checkpoint C's loop proved live** (add → activate → focus → card 1/2 at 50%, bento 0.1 hrs / 25%, no reload). A live error the user hit — `Could not find public function for 'tasks:progressCard'` — was simply the new queries not yet pushed to `dashing-caribou-892`; resolved by `convex dev --once`. Lint/`tsc`/build/288 tests green. **Checkpoint C passed, awaiting human review.** |
-| 13-28 | not started | |
+| 13 | done | `convex/projects.ts` — create/rename/archive (+unarchive)/list/`overview`, 100-active cap, archive rewrites nothing (pinned by re-reading task + session after archive). Gate: `tests/projects.test.ts` (20). UI: `components/projects/{filter,picker,project-manager}.tsx` wired through panel/list/input; `tests/projects-ui.test.tsx` (24). `tsc`/lint/build green; 342 tests green. |
+| 14 | done | `projects.overview` — open/done, estimated/completed leaves, focus time from the `projectId` snapshot (rename/archive-proof), calm empty state; `components/projects/overview.tsx` renders under the list while a filter is selected (panel, not a route). Same gates as 13. Checkpoint D ready for human review. |
+| 15-28 | not started | |

@@ -29,7 +29,10 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 | D3 | MVP scope | **Full feature set**: timer + tasks + session progress + streak + Focus Shroud + settings + **stats/history surface (incl. user-facing analytics: trends, time-of-day)** + **project management** (revised 2026-10-14; "analytics" clarified = user-facing, merged into stats — no third-party product telemetry) |
 | D4 | Timer rules | **Classic pomodoro defaults**, user-configurable in Settings |
 | D5 | Streak rule | ≥1 completed focus session earns a day; miss a local calendar day breaks it; device-local midnight; no grace period |
-| D6 | Stack | **Next.js (latest, App Router) + Tailwind + shadcn/ui + Zustand**; frontend on Vercel (Convex free tier hosts backend) — *verify Convex hosting options before deploy* |
+| D6 | Stack | **Next.js (latest, App Router) + Tailwind + HeroUI v3 + Zustand**; frontend on Vercel (Convex free tier hosts backend) — *verify Convex hosting options before deploy* |
+| D6a | UI library | **HeroUI v3** replaces shadcn/ui (revised 2026-10-16). Rule: if HeroUI has the component, use it; build from scratch only where it has none. Existing components get **rewritten onto HeroUI** in a dedicated phase before Projects — the only things still built by hand are the drag-and-drop task list (HeroUI ships no DnD) and glass/gradient surface styling (CSS, not a component) |
+| D6b | Themes | **Three HeroUI themes** — Mint (default, hue 155°), Airbnb (17°), Rabbit (36.66°) — each with **both light and dark mode**, switched at runtime via HeroUI's `data-theme` tokens. This **drops the fixed `#131313` canvas** in DESIGN.md — light mode is a first-class surface, not a discard. "No pure white" is **kept as a dark-mode-only rule** (DESIGN.md's "no pure white" line and fixed-`#131313` body are both marked STALE; light mode may render `oklch(100%)`/`oklch(97%)` surfaces, dark themes keep the canvas off pure white). The DOM tests that enforced the old dark-only rules are re-derived per mode. The CTA gradient becomes **theme-aware** — each theme supplies its own two-stop gradient (accent + darker sibling) at the fixed `145°` geometry, so an accent hue change retints the button with it |
+| D6c | Typeface | **JetBrains Mono for everything** (revised 2026-10-16). This **supersedes the mono/Inter pairing** in `docs/design/typography.md`: there is no Inter anywhere. JetBrains Mono is already self-hosted via `next/font`; pointing `--font-sans`/`--font-mono` at it — which the three themes' own `--font-sans` tokens expect — also retints HeroUI's components to mono |
 | D7 | Sign-in data merge | **Ask on sign-in** ("keep device data?"), merge is the default button; plus **CSV session import** |
 | D8 | Session ↔ task binding | Session assigned to `activeTaskId` **at start**, immutable thereafter; estimate = leaf count (default 2, range 0–8) |
 | D9 | Offline | **Online-only.** No outbox, no local persistence layer. Timer is client state; mutations require connectivity |
@@ -38,7 +41,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 
 1. Web app only (no native mobile); installable/PWA behavior is out of MVP scope.
 2. ~~"Project" is a plain optional string tag on a task~~ **Revised:** projects are a first-class entity with CRUD (see §4.1).
-3. Design fidelity follows `DESIGN.md` tokens exactly (`#131313`, `#4BE277`, no pure white, no 1px divider lines).
+3. Design fidelity follows `DESIGN.md` tokens exactly (`#131313` + "no pure white" apply to **dark mode only** per D6b; `#4BE277` primary and "no 1px divider lines" apply to all modes). See D6a–D6c for the HeroUI / theme / typeface revisions.
 4. The footer's `v2.4.1` version/uptime and `PWA INSTALLED` chrome are decorative; MVP shows real local time + real connection status only (the two-column design's footer placeholders are replaced in Task 26).
 5. English-only MVP.
 
@@ -88,7 +91,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 - Full-screen overlay that dims everything except the timer and active task while a focus session is running; dismissible per DESIGN.md ("Focus Shroud" component).
 - The canonical two-column screen has **no shroud equivalent**; implement from the salvaged markup in `docs/design/screens/focus-shroud-snippet.html` + DESIGN.md §5 (ADR-004). Task 18 has no other source.
 
-**Settings** (modal, shadcn dialog)
+**Settings** (modal, HeroUI Dialog)
 - Focus/short/long durations, session count N.
 - Auto-start toggles (both directions).
 - Notifications on/off.
@@ -139,9 +142,9 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 ## 5. UX requirements (binding from DESIGN.md)
 
 - **No-line rule:** no 1px solid borders for sectioning; boundaries via tonal shifts + whitespace.
-- **No pure white:** text uses `on-surface` `#E5E2E1`.
-- **Palette:** background `#131313`, primary `#4BE277`, surface containers per token table in `code.html`.
-- **Type:** Inter for UI, JetBrains Mono for timer digits and status chrome; `tracking-tight` headlines, uppercase micro-labels.
+- **No pure white:** *dark-mode-only* (D6b — light mode may render `oklch(100%)`/`oklch(97%)` surfaces). In dark mode, text uses `on-surface` `#E5E2E1`.
+- **Palette:** background + primary are **per-theme tokens** (D6b): three themes × light/dark. `#131313` / `#4BE277` are the **dark themes'** reference values; the CTA gradient is theme-aware at fixed `145°`.
+- **Type:** JetBrains Mono everywhere (D6c — supersedes the Inter/Mono pairing); `tracking-tight` headlines, uppercase micro-labels.
 - **Texture:** primary CTAs use the 145° `primary → primary-container` gradient; modals/drawers use glassmorphism (60% surface + 20px backdrop-blur).
 - **Motion:** all transitions use `cubic-bezier(0.4, 0, 0.2, 1)`.
 - **Errors:** use `tertiary` (muted coral), never alert-red panic styling.
@@ -171,7 +174,7 @@ settings         — ownerId, focusMin, shortMin, longMin, sessionCount,
 ## 7. Tech stack & structure
 
 ```
-Next.js (latest, App Router) · TypeScript · Tailwind · shadcn/ui
+Next.js (latest, App Router) · TypeScript · Tailwind · HeroUI v3
 Zustand (timer state) · Convex (backend, auth, hosting for functions)
 Vercel (frontend hosting) — Convex hosting alternative: verify free tier first
 ```

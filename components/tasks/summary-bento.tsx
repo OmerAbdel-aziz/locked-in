@@ -24,6 +24,7 @@ import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { useTzOffsetMinutes } from "@/lib/use-tz-offset";
+import { Card } from "@heroui/react";
 
 export interface SummaryData {
   /** Today's total focus time, in minutes. Breaks are not work and never count. */
@@ -34,7 +35,12 @@ export interface SummaryData {
   estimatedLeaves: number;
 }
 
-/** The bento's markup, pure, so the formatting is testable without Convex. */
+/** The bento's markup, pure, so the formatting is testable without Convex.
+ *
+ * HeroUI mapping (PRD D6a, Phase 3.5d): each tile is a Card. The ghost
+ * border and tonal fill stay as classes — the tiles' surfaces are DESIGN.md
+ * tonal treatments, not prominence levels a variant prop could name.
+ */
 export function SummaryBentoView({ summary }: { summary: SummaryData }) {
   const hours = summary.focusMinutes / 60;
   // No denominator means no ratio — showing "0%" would report a failure for
@@ -46,7 +52,7 @@ export function SummaryBentoView({ summary }: { summary: SummaryData }) {
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <div className="rounded-2xl border border-outline-variant/5 bg-surface-container-low/30 p-5">
+      <Card className="rounded-2xl border border-outline-variant/5 bg-surface-container-low/30 p-5">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
           Today&apos;s Output
         </p>
@@ -56,9 +62,9 @@ export function SummaryBentoView({ summary }: { summary: SummaryData }) {
             hrs
           </span>
         </p>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-outline-variant/5 bg-surface-container-low/30 p-5">
+      <Card className="rounded-2xl border border-outline-variant/5 bg-surface-container-low/30 p-5">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
           Focus Score
         </p>
@@ -66,7 +72,7 @@ export function SummaryBentoView({ summary }: { summary: SummaryData }) {
         <p className="text-2xl font-bold tracking-tight text-primary">
           {score === null ? "—" : `${score}%`}
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

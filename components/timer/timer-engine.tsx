@@ -49,7 +49,7 @@ export function TimerEngine() {
   return (
     <section
       aria-label="Timer engine"
-      className="flex w-full max-w-md flex-col items-center justify-center"
+      className="flex w-full max-w-xs min-w-0 flex-col items-center justify-center"
     >
       {/* `@container` so the readout can size itself to the ring rather than
           to the viewport — the digits nest inside the circle at every width

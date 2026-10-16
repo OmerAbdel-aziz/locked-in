@@ -21,6 +21,8 @@
 
 import type { DropPosition } from "@/lib/task-order";
 
+import { Checkbox } from "@heroui/react";
+
 import { CheckIcon, DragHandleIcon } from "./task-icons";
 
 /** What the panel hands the list: a task, flattened to what a row shows. */
@@ -41,6 +43,14 @@ export interface TaskRow<Id extends string = string> {
   isActive: boolean;
   /** Rendered inline beside the title; `null` while no project exists (Task 13). */
   projectName: string | null;
+  /**
+   * Which project the tag names — the filter's join key (Task 13). Optional
+   * because rows built before projects existed carry no id; absent reads as
+   * unassigned, the same honest default the panel shows while queries settle.
+   */
+  projectId?: string | null;
+  /** True when the named project is archived — the tag renders muted. */
+  projectArchived?: boolean;
 }
 
 interface TaskItemProps<Id extends string> {
@@ -69,8 +79,8 @@ export function TaskItem<Id extends string>({
     : "bg-surface-container-low/50 hover:bg-surface-container-low";
 
   const checkbox = row.done
-    ? "flex size-5 shrink-0 items-center justify-center rounded bg-primary text-on-primary"
-    : "flex size-5 shrink-0 items-center justify-center rounded border border-outline-variant text-transparent transition-colors group-hover:border-primary";
+    ? "bg-primary text-on-primary"
+    : "border border-outline-variant text-transparent transition-colors group-hover:border-primary";
 
   return (
     <div
@@ -129,22 +139,40 @@ export function TaskItem<Id extends string>({
       }${dragging ? " opacity-40" : ""}`}
     >
       <div className="flex min-w-0 items-center gap-4">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={row.done}
-          aria-label={`${row.done ? "Uncomplete" : "Complete"} ${row.title}`}
+        {/* HeroUI Checkbox (PRD D6a). The stopPropagation stays: completing
+            must not also select — the row above owns selection, and one
+            control making both decisions would mean ticking the active task
+            silently re-aims what the running timer credits. Stopping at a
+            wrapper (rather than inside HeroUI's slots) keeps the guarantee
+            independent of the library's internal structure. */}
+        <span
           onClick={(event) => {
-            // Completing must not also select: the row above owns selection,
-            // and one control making both decisions would mean ticking the
-            // active task silently re-aims what the running timer credits.
             event.stopPropagation();
-            onToggle(row.id, !row.done);
           }}
-          className={checkbox}
+          className="flex shrink-0"
         >
-          {row.done ? <CheckIcon className="size-3.5" /> : null}
-        </button>
+          <Checkbox
+            isSelected={row.done}
+            onChange={() => onToggle(row.id, !row.done)}
+            aria-label={`${row.done ? "Uncomplete" : "Complete"} ${row.title}`}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control
+                className={`flex size-5 items-center justify-center rounded ${checkbox}`}
+              >
+                {/* Render function, not static children: static `null`
+                    children would fall through to HeroUI's default
+                    checkmark SVG, leaving a hidden-but-present mark in
+                    every unchecked box. */}
+                <Checkbox.Indicator>
+                  {({ isSelected }: { isSelected: boolean }) =>
+                    isSelected ? <CheckIcon className="size-3.5" /> : null
+                  }
+                </Checkbox.Indicator>
+              </Checkbox.Control>
+            </Checkbox.Content>
+          </Checkbox>
+        </span>
 
         {/* `code.html` recedes a finished row with `opacity-40` on the pill
             and a strikethrough on the title, and overrides no colours — the
@@ -159,9 +187,20 @@ export function TaskItem<Id extends string>({
         </span>
 
         {/* PRD §4.1 requires the tag; the design has no place for it, so it
-            rides inline beside the title rather than claiming its own column. */}
+            rides inline beside the title rather than claiming its own column.
+            A task of an archived project keeps the tag, muted — the archive
+            hides the project, never the attribution (Task 13). */}
         {row.projectName === null ? null : (
-          <span className="shrink-0 rounded bg-surface-container-highest px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">
+          <span
+            className={`shrink-0 rounded bg-surface-container-highest px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-on-surface-variant${
+              row.projectArchived === true ? " opacity-50" : ""
+            }`}
+            title={
+              row.projectArchived === true
+                ? `${row.projectName} (archived)`
+                : undefined
+            }
+          >
             {row.projectName}
           </span>
         )}

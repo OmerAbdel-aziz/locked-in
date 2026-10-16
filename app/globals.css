@@ -1,17 +1,33 @@
 @import "tailwindcss";
+@import "@heroui/styles";
 
 /*
  * Locked In design tokens.
  *
- * Ported from the Stitch design package — docs/design/tokens.json, which was
- * extracted verbatim from `code.html`'s tailwind.config and verified to match
- * the project's designTheme.namedColors exactly (47 colors, zero mismatches).
- * See docs/design/README.md for provenance.
+ * Two layers, newest last:
  *
- * Tailwind v4 is CSS-first: tokens live here in `@theme` rather than in a
- * tailwind.config.ts. Each `--color-*` below becomes a `bg-*`/`text-*`/
- * `border-*` utility automatically.
+ *   1. LEGACY (@theme below) — the 47 Stitch tokens ported in Task 2 from
+ *      docs/design/tokens.json. Kept verbatim so every `bg-surface-*` /
+ *      `text-on-surface*` class in the current components keeps resolving
+ *      while the HeroUI rewrite lands slice by slice (Phase 3.5c/d). The
+ *      design-tokens gate still pins all 47 hexes. Do not extend this set —
+ *      new surfaces use the HeroUI tokens in layer 2.
+ *
+ *   2. HEROUI THEMES (Phase 3.5b) — Mint (default, hue 155°), Airbnb (17°),
+ *      Rabbit (36.66°), each with a light and a dark variant, ported from
+ *      docs/design/heroui-themes.css (the source-of-truth copy of the root
+ *      temp.css). Values are verbatim except for the selector namespacing:
+ *      the source repeats `:root/.light/.default/[data-theme="light"]` for
+ *      all three palettes, which would collapse into one cascade — each
+ *      palette instead resolves under its own `data-theme` name, with
+ *      `-dark` for its dark mode. Mint is the default palette; `:root`
+ *      carries mint-light per HeroUI convention, and layout.tsx sets
+ *      `data-theme="mint-dark"` so first paint stays the dark product.
+ *
+ *      Theme *switching UI* is Phase 5 — this is the token groundwork only.
  */
+
+/* ---- Layer 1: legacy Stitch tokens (Task 2, frozen) ---- */
 @theme {
   /* ---- Palette: 47 tokens, verbatim from the design package ---- */
 
@@ -74,15 +90,15 @@
   --color-outline: #869585;
   --color-outline-variant: #3d4a3d;
 
-  /* ---- Typography ---- */
-
-  /* Inter is the default UI font; JetBrains Mono carries timer digits
-     and status chrome (DESIGN.md §3). Both self-hosted via next/font. */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* ---- Typography (Phase 3.5a, PRD D6c) ----
+     All-JetBrains-Mono: every font token resolves to var(--font-jetbrains),
+     self-hosted via next/font in layout.tsx. The mono/Inter pairing DESIGN.md
+     §3 described is superseded — see docs/design/typography.md. */
+  --font-sans: var(--font-jetbrains), ui-monospace, monospace;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
-  --font-headline: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-label: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-headline: var(--font-jetbrains), ui-monospace, monospace;
+  --font-body: var(--font-jetbrains), ui-monospace, monospace;
+  --font-label: var(--font-jetbrains), ui-monospace, monospace;
 
   /* ---- Radius (design package: 0.25 / 0.5 / 0.75 / full) ---- */
 
@@ -98,44 +114,362 @@
   --ease-sanctuary: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ---- Layer 2: HeroUI themes (Phase 3.5b) ----
+   Verbatim values from docs/design/heroui-themes.css; only the selectors
+   are namespaced per palette. Each palette adds its own two-stop CTA
+   gradient (accent + darker sibling) at the fixed 145° geometry (PRD D6b):
+   the geometry never varies, the hue follows the theme. */
+
+/* Mint light (default palette, light mode) */
+:root,
+[data-theme="mint"],
+[data-theme="light"],
+[data-theme="default"] {
+  color-scheme: light;
+  --accent: oklch(82% 0.12 155);
+  --accent-foreground: oklch(15% 0.024 155);
+  --background: oklch(97.02% 0.0015 155);
+  --border: oklch(90% 0.0015 155);
+  --danger: oklch(65.32% 0.2335 13.88);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(94% 0.0015 155);
+  --default-foreground: oklch(21.03% 0.0059 155);
+  --field-background: oklch(100% 0.0008 155);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0.0015 155);
+  --field-placeholder: oklch(55.17% 0.003 155);
+  --focus: oklch(82% 0.12 155);
+  --foreground: oklch(21.03% 0.0015 155);
+  --muted: oklch(55.17% 0.003 155);
+  --overlay: oklch(100% 0.0004 155);
+  --overlay-foreground: oklch(21.03% 0.0015 155);
+  --scrollbar: oklch(87.1% 0.0015 155);
+  --segment: oklch(100% 0.0015 155);
+  --segment-foreground: oklch(21.03% 0.0015 155);
+  --separator: oklch(92% 0.0015 155);
+  --success: oklch(73.29% 0.1941 138.95);
+  --success-foreground: oklch(21.03% 0.0059 138.95);
+  --surface: oklch(100% 0.0008 155);
+  --surface-foreground: oklch(21.03% 0.0015 155);
+  --surface-secondary: oklch(95.24% 0.0012 155);
+  --surface-secondary-foreground: oklch(21.03% 0.0015 155);
+  --surface-tertiary: oklch(93.73% 0.0012 155);
+  --surface-tertiary-foreground: oklch(21.03% 0.0015 155);
+  --warning: oklch(78.19% 0.159 60.47);
+  --warning-foreground: oklch(21.03% 0.0059 60.47);
+  --radius: 0.5rem;
+  --field-radius: 0.75rem;
+  --cta-from: oklch(82% 0.12 155);
+  --cta-to: oklch(66% 0.14 155);
+}
+
+/* Mint dark */
+.dark,
+[data-theme="dark"],
+[data-theme="mint-dark"] {
+  color-scheme: dark;
+  --accent: oklch(82% 0.12 155);
+  --accent-foreground: oklch(15% 0.024 155);
+  --background: oklch(12% 0.0015 155);
+  --border: oklch(28% 0.0015 155);
+  --danger: oklch(59.4% 0.1973 12.77);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(27.4% 0.0015 155);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.03% 0.003 155);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0.0015 155);
+  --field-placeholder: oklch(70.5% 0.003 155);
+  --focus: oklch(82% 0.12 155);
+  --foreground: oklch(99.11% 0.0015 155);
+  --muted: oklch(70.5% 0.003 155);
+  --overlay: oklch(21.03% 0.003 155);
+  --overlay-foreground: oklch(99.11% 0.0015 155);
+  --scrollbar: oklch(70.5% 0.0015 155);
+  --segment: oklch(39.64% 0.0015 155);
+  --segment-foreground: oklch(99.11% 0.0015 155);
+  --separator: oklch(25% 0.0015 155);
+  --success: oklch(73.29% 0.1941 138.95);
+  --success-foreground: oklch(21.03% 0.0059 138.95);
+  --surface: oklch(21.03% 0.003 155);
+  --surface-foreground: oklch(99.11% 0.0015 155);
+  --surface-secondary: oklch(25.7% 0.0023 155);
+  --surface-secondary-foreground: oklch(99.11% 0.0015 155);
+  --surface-tertiary: oklch(27.21% 0.0023 155);
+  --surface-tertiary-foreground: oklch(99.11% 0.0015 155);
+  --warning: oklch(82.03% 0.1392 64.48);
+  --warning-foreground: oklch(21.03% 0.0059 64.48);
+  --cta-from: oklch(82% 0.12 155);
+  --cta-to: oklch(66% 0.14 155);
+}
+
+/* Airbnb light */
+[data-theme="airbnb"] {
+  color-scheme: light;
+  --accent: oklch(65.79% 0.2309 17.07);
+  --accent-foreground: oklch(0.9911 0 0);
+  --background: oklch(97.02% 0 17.07);
+  --border: oklch(90% 0 17.07);
+  --danger: oklch(0.5392 0.1816 33.72);
+  --danger-foreground: oklch(0.9911 0 0);
+  --default: oklch(94% 0 17.07);
+  --default-foreground: oklch(21.03% 0.0059 17.07);
+  --field-background: oklch(100% 0 17.07);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0 17.07);
+  --field-placeholder: oklch(55.17% 0 17.07);
+  --focus: oklch(65.79% 0.2309 17.07);
+  --foreground: oklch(21.03% 0 17.07);
+  --muted: oklch(55.17% 0 17.07);
+  --overlay: oklch(100% 0 17.07);
+  --overlay-foreground: oklch(21.03% 0 17.07);
+  --scrollbar: oklch(87.1% 0 17.07);
+  --segment: oklch(100% 0 17.07);
+  --segment-foreground: oklch(21.03% 0 17.07);
+  --separator: oklch(92% 0 17.07);
+  --success: oklch(0.5573 0.0947 199.48);
+  --success-foreground: oklch(0.9911 0 0);
+  --surface: oklch(100% 0 17.07);
+  --surface-foreground: oklch(21.03% 0 17.07);
+  --surface-secondary: oklch(95.24% 0 17.07);
+  --surface-secondary-foreground: oklch(21.03% 0 17.07);
+  --surface-tertiary: oklch(93.73% 0 17.07);
+  --surface-tertiary-foreground: oklch(21.03% 0 17.07);
+  --warning: oklch(0.6904 0.1972 38.75);
+  --warning-foreground: oklch(0.9911 0 0);
+  --radius: 0.5rem;
+  --field-radius: 0.75rem;
+  --cta-from: oklch(65.79% 0.2309 17.07);
+  --cta-to: oklch(54% 0.21 17.07);
+}
+
+/* Airbnb dark */
+[data-theme="airbnb-dark"] {
+  color-scheme: dark;
+  --accent: oklch(65.79% 0.2309 17.07);
+  --accent-foreground: oklch(0.9911 0 0);
+  --background: oklch(12% 0 17.07);
+  --border: oklch(28% 0 17.07);
+  --danger: oklch(0.5392 0.1816 33.72);
+  --danger-foreground: oklch(0.9911 0 0);
+  --default: oklch(27.4% 0 17.07);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.03% 0 17.07);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0 17.07);
+  --field-placeholder: oklch(70.5% 0 17.07);
+  --focus: oklch(65.79% 0.2309 17.07);
+  --foreground: oklch(99.11% 0 17.07);
+  --muted: oklch(70.5% 0 17.07);
+  --overlay: oklch(21.03% 0 17.07);
+  --overlay-foreground: oklch(99.11% 0 17.07);
+  --scrollbar: oklch(70.5% 0 17.07);
+  --segment: oklch(39.64% 0 17.07);
+  --segment-foreground: oklch(99.11% 0 17.07);
+  --separator: oklch(25% 0 17.07);
+  --success: oklch(0.652 0.114864 185.0749);
+  --success-foreground: oklch(0.9911 0 0);
+  --surface: oklch(21.03% 0 17.07);
+  --surface-foreground: oklch(99.11% 0 17.07);
+  --surface-secondary: oklch(25.7% 0 17.07);
+  --surface-secondary-foreground: oklch(99.11% 0 17.07);
+  --surface-tertiary: oklch(27.21% 0 17.07);
+  --surface-tertiary-foreground: oklch(99.11% 0 17.07);
+  --warning: oklch(0.8197 0.170602 78.4658);
+  --warning-foreground: oklch(15% 0.05 78.47);
+  --cta-from: oklch(65.79% 0.2309 17.07);
+  --cta-to: oklch(54% 0.21 17.07);
+}
+
+/* Rabbit light */
+[data-theme="rabbit"] {
+  color-scheme: light;
+  --accent: oklch(66.78% 0.2232 36.66);
+  --accent-foreground: oklch(15% 0.03 36.66);
+  --background: oklch(97.02% 0.01 36.66);
+  --border: oklch(90% 0.01 36.66);
+  --danger: oklch(0.6291 0.2565 29.09);
+  --danger-foreground: oklch(98% 0.02 29.09);
+  --default: oklch(94% 0.01 36.66);
+  --default-foreground: oklch(21.03% 0.0059 36.66);
+  --field-background: oklch(100% 0.005 36.66);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0.01 36.66);
+  --field-placeholder: oklch(55.17% 0.02 36.66);
+  --focus: oklch(66.78% 0.2232 36.66);
+  --foreground: oklch(21.03% 0.01 36.66);
+  --muted: oklch(55.17% 0.02 36.66);
+  --overlay: oklch(100% 0.003 36.66);
+  --overlay-foreground: oklch(21.03% 0.01 36.66);
+  --scrollbar: oklch(87.1% 0.01 36.66);
+  --segment: oklch(100% 0.01 36.66);
+  --segment-foreground: oklch(21.03% 0.01 36.66);
+  --separator: oklch(92% 0.01 36.66);
+  --success: oklch(0.7113 0.2043 140.81);
+  --success-foreground: oklch(15% 0.05 140.81);
+  --surface: oklch(100% 0.005 36.66);
+  --surface-foreground: oklch(21.03% 0.01 36.66);
+  --surface-secondary: oklch(95.24% 0.008 36.66);
+  --surface-secondary-foreground: oklch(21.03% 0.01 36.66);
+  --surface-tertiary: oklch(93.73% 0.008 36.66);
+  --surface-tertiary-foreground: oklch(21.03% 0.01 36.66);
+  --warning: oklch(78.19% 0.1617 46.27);
+  --warning-foreground: oklch(21.03% 0.0059 46.27);
+  --radius: 0.5rem;
+  --field-radius: 1rem;
+  --cta-from: oklch(66.78% 0.2232 36.66);
+  --cta-to: oklch(55% 0.2 36.66);
+}
+
+/* Rabbit dark */
+[data-theme="rabbit-dark"] {
+  color-scheme: dark;
+  --accent: oklch(66.78% 0.2232 36.66);
+  --accent-foreground: oklch(15% 0.03 36.66);
+  --background: oklch(12% 0.01 36.66);
+  --border: oklch(28% 0.01 36.66);
+  --danger: oklch(0.6291 0.2565 29.09);
+  --danger-foreground: oklch(98% 0.02 29.09);
+  --default: oklch(27.4% 0.01 36.66);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.03% 0.02 36.66);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0.01 36.66);
+  --field-placeholder: oklch(70.5% 0.02 36.66);
+  --focus: oklch(66.78% 0.2232 36.66);
+  --foreground: oklch(99.11% 0.01 36.66);
+  --muted: oklch(70.5% 0.02 36.66);
+  --overlay: oklch(21.03% 0.02 36.66);
+  --overlay-foreground: oklch(99.11% 0.01 36.66);
+  --scrollbar: oklch(70.5% 0.01 36.66);
+  --segment: oklch(39.64% 0.01 36.66);
+  --segment-foreground: oklch(99.11% 0.01 36.66);
+  --separator: oklch(25% 0.01 36.66);
+  --success: oklch(0.7113 0.2043 140.81);
+  --success-foreground: oklch(15% 0.05 140.81);
+  --surface: oklch(21.03% 0.02 36.66);
+  --surface-foreground: oklch(99.11% 0.01 36.66);
+  --surface-secondary: oklch(25.7% 0.015 36.66);
+  --surface-secondary-foreground: oklch(99.11% 0.01 36.66);
+  --surface-tertiary: oklch(27.21% 0.015 36.66);
+  --surface-tertiary-foreground: oklch(99.11% 0.01 36.66);
+  --warning: oklch(82.03% 0.1416 50.28);
+  --warning-foreground: oklch(21.03% 0.0059 50.28);
+  --cta-from: oklch(66.78% 0.2232 36.66);
+  --cta-to: oklch(55% 0.2 36.66);
+}
+
 /*
- * Base layer — DESIGN.md binding rules applied app-wide.
+ * Typeface override (Phase 3.5a, PRD D6c).
+ * The ported themes reference `var(--font-inter)` for `--font-sans`; Inter
+ * is gone, so every theme resolves both font tokens at JetBrains Mono.
+ * Declared after the theme blocks so it wins over each of them.
+ */
+:root,
+[data-theme] {
+  --font-sans: var(--font-jetbrains), ui-monospace, monospace;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/*
+ * HeroUI Tabs override (DESIGN.md no-line rule, audit 2026-10-16).
+ *
+ * HeroUI draws a full-width `border-b` track on every horizontal tab list
+ * and a separate indicator under the active tab. The indicator is the
+ * design's own control affordance and stays; the track is a sectioning
+ * divider and goes. Equal specificity to the library rule, later in the
+ * cascade (this file imports `@heroui/styles` first), so this wins.
+ */
+@layer components {
+  .tabs[data-orientation="horizontal"] > .tabs__list-container {
+    border-bottom-width: 0;
+  }
+}
+
+/*
+ * Entrance motion (audit 2026-10-16).
+ *
+ * One staggered rise per section on first paint — heading-adjacent content
+ * first, supporting panels after — at the sanctuary easing. Pure CSS, so
+ * there is no hidden-until-script failure mode; `prefers-reduced-motion`
+ * keeps the content and drops the travel.
+ */
+@keyframes sanctuary-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .enter {
+    animation: sanctuary-enter 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  .enter-1 {
+    animation-delay: 70ms;
+  }
+  .enter-2 {
+    animation-delay: 140ms;
+  }
+  .enter-3 {
+    animation-delay: 210ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .enter,
+    .enter-1,
+    .enter-2,
+    .enter-3 {
+      animation: none;
+    }
+  }
+}
+
+/*
+ * Base layer — DESIGN.md binding rules as amended by Phase 3.5b: the body is
+ * theme-aware (light mode is first-class, PRD D6b) with the legacy void as
+ * the fallback before any theme resolves.
  */
 @layer base {
   :root {
-    color-scheme: dark;
-    /* Set on :root as well as body: with `color-scheme: dark`, the root's
+    /* Set on :root as well as body: with a dark `color-scheme`, the root's
        initial `color` resolves to the white `canvastext` system color. Body
        content inherits from body anyway, but pinning it here keeps the
-       "no pure white anywhere" invariant true even for the <html> element. */
-    color: var(--color-on-surface);
+       "no pure white anywhere" invariant true even for the <html> element.
+       Each `[data-theme]` block above sets its own scheme; this declaration
+       only grounds the pre-theme instant. */
+    color: var(--foreground, var(--color-on-surface));
   }
 
   body {
-    /* DESIGN.md: background is "the void" — #131313, never pure white. */
-    background-color: var(--color-background);
-    /* DESIGN.md Don't: #FFFFFF is too aggressive; on-surface is #e5e2e1. */
-    color: var(--color-on-surface);
+    background-color: var(--background, var(--color-background));
+    color: var(--foreground, var(--color-on-surface));
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background-color: var(--color-primary);
-    color: var(--color-on-primary);
+    background-color: var(--accent, var(--color-primary));
+    color: var(--accent-foreground, var(--color-on-primary));
   }
 }
 
 /*
- * Signature texture (DESIGN.md "Glass & Gradient" Rule): main CTAs are not
- * flat — a 145deg primary -> primary-container gradient, "lit from within".
+ * Signature texture (DESIGN.md "Glass & Gradient" Rule, theme-aware per
+ * PRD D6b): main CTAs are a 145° two-stop gradient. The stops follow the
+ * active theme; the geometry never varies. Legacy primary tokens are the
+ * fallback before any theme resolves.
  */
 @utility cta-gradient {
   background-image: linear-gradient(
     145deg,
-    var(--color-primary),
-    var(--color-primary-container)
+    var(--cta-from, var(--color-primary)),
+    var(--cta-to, var(--color-primary-container))
   );
 }
 
@@ -144,7 +478,11 @@
  * opacity over a 20px backdrop blur.
  */
 @utility glass-panel {
-  background-color: color-mix(in srgb, var(--color-surface) 60%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--surface, var(--color-surface)) 60%,
+    transparent
+  );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }

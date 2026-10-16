@@ -244,7 +244,9 @@ describe("adding a task", () => {
     fireEvent.submit(screen.getByLabelText("New task title").closest("form")!);
 
     expect(onCreate).toHaveBeenCalledTimes(1);
-    expect(onCreate).toHaveBeenCalledWith("Ship the thing", DEFAULT_ESTIMATE);
+    // Third argument is the picked project: absent while the Task 13 picker
+    // offers nothing, travelling as "no argument" (unassigned).
+    expect(onCreate).toHaveBeenCalledWith("Ship the thing", DEFAULT_ESTIMATE, undefined);
     expect(DEFAULT_ESTIMATE).toBe(2);
   });
 
@@ -257,7 +259,7 @@ describe("adding a task", () => {
     });
     fireEvent.submit(screen.getByLabelText("New task title").closest("form")!);
 
-    expect(onCreate).toHaveBeenCalledWith("Long thing", 6);
+    expect(onCreate).toHaveBeenCalledWith("Long thing", 6, undefined);
   });
 
   it.each(["", "     "])("submits nothing for the blank title %j", (title) => {
@@ -498,6 +500,24 @@ describe("clear completed", () => {
   });
 });
 
+describe("the empty list (audit 2026-10-16)", () => {
+  it("guides a first-time visitor instead of showing a void", () => {
+    renderList([]);
+
+    expect(
+      screen.getByText(/add your first above to start collecting leaves/),
+    ).toBeTruthy();
+  });
+
+  it("leaves with the first task", () => {
+    renderList(TASKS);
+
+    expect(
+      screen.queryByText(/add your first above to start collecting leaves/),
+    ).toBeNull();
+  });
+});
+
 describe("the row's design details", () => {
   it("dims a finished row and strikes its title through", () => {
     renderList(TASKS);
@@ -546,12 +566,11 @@ describe("toTaskRows", () => {
     });
 
     expect(rows).toEqual([
-      // No options means "nothing selected and no sessions yet", which is
-      // exactly what the panel shows while the two queries settle — an
-      // honest default, not a placeholder for a value on its way.
-      // projectName: no projects exist yet — Task 13.
-      { id: "a", title: "open", estimate: 2, done: false, completedLeaves: 0, isActive: false, projectName: null },
-      { id: "b", title: "finished", estimate: 1, done: true, completedLeaves: 0, isActive: false, projectName: null },
+      // No options means "nothing selected, no sessions yet, and no project
+      // names yet", which is exactly what the panel shows while the queries
+      // settle — an honest default, not a placeholder for a value on its way.
+      { id: "a", title: "open", estimate: 2, done: false, completedLeaves: 0, isActive: false, projectId: null, projectName: null, projectArchived: false },
+      { id: "b", title: "finished", estimate: 1, done: true, completedLeaves: 0, isActive: false, projectId: null, projectName: null, projectArchived: false },
     ]);
   });
 
@@ -797,13 +816,16 @@ describe("DESIGN.md's binding rules hold in the rendered output", () => {
 
     // DESIGN.md §5: "A 1px solid border is reserved for interactive
     // affordances such as inputs." In this panel that is the checkboxes —
-    // the design's own markup draws them with `border border-outline-variant`
-    // — and nothing else may use one.
+    // HeroUI's `checkbox__control` (Phase 3.5d; the design's own markup drew
+    // them with `border border-outline-variant`) — and nothing else may use
+    // one.
     const bareBorders = Array.from(container.querySelectorAll("*")).filter(
       (element) => element.classList.contains("border"),
     );
     const notAffordances = bareBorders.filter(
-      (element) => element.getAttribute("role") !== "checkbox",
+      (element) =>
+        element.getAttribute("role") !== "checkbox" &&
+        !element.classList.contains("checkbox__control"),
     );
 
     expect(notAffordances.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
@@ -858,14 +880,16 @@ describe("the panel waits for an identity", () => {
 
     render(<TaskPanel />);
 
-    // All three, not "the last one": every query this panel makes resolves
-    // an owner, so all three must be gated together. Asserting on the
+    // All five, not "the last one": every query this panel makes resolves
+    // an owner, so all five must be gated together. Asserting on the
     // *arguments* rather than on `toHaveBeenLastCalledWith(...)` is the point
     // — the generated api hands back property-less proxies, so two different
     // queries deep-compare equal and an assertion naming one of them passes
     // no matter which one was actually called. A new owner-derived query that
     // forgot the gate fails this line by changing the array's length.
     expect(vi.mocked(useQuery).mock.calls.map(([, args]) => args)).toEqual([
+      "skip",
+      "skip",
       "skip",
       "skip",
       "skip",
@@ -878,6 +902,8 @@ describe("the panel waits for an identity", () => {
     render(<TaskPanel />);
 
     expect(vi.mocked(useQuery).mock.calls.map(([, args]) => args)).toEqual([
+      {},
+      {},
       {},
       {},
       {},

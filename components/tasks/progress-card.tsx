@@ -21,6 +21,7 @@
 
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
+import { Card } from "@heroui/react";
 
 import { api } from "@/convex/_generated/api";
 
@@ -35,6 +36,12 @@ export interface ProgressCardData {
  * The card's markup, pure. `data` is `null` for "nothing selected" and is
  * never `undefined`: the bound component collapses the settling query into
  * `null`, so there is one empty case, not two.
+ *
+ * HeroUI mapping (PRD D6a, Phase 3.5d): Card carries the design's
+ * glassmorphism (`glass-panel`) and its ghost border
+ * (`border-outline-variant` at 10%) — the surface tokens stay theme-aware
+ * through the classes, not through a variant prop, because the ghost border
+ * is a DESIGN.md invention no variant expresses.
  */
 export function ProgressCardView({ data }: { data: ProgressCardData | null }) {
   // A task may exceed its estimate — a finished task keeps receiving focus
@@ -45,7 +52,7 @@ export function ProgressCardView({ data }: { data: ProgressCardData | null }) {
       : Math.min(100, (data.leaves / data.estimate) * 100);
 
   return (
-    <div className="glass-panel w-full max-w-md space-y-4 rounded-xl border border-outline-variant/10 p-6">
+    <Card className="glass-panel w-full max-w-xs space-y-4 rounded-xl border border-outline-variant/10 p-6">
       <div className="flex items-center gap-3">
         {/* The dot pulses only while something is actually selected: a live
             pulse over "nothing selected" would claim activity that is not
@@ -71,7 +78,7 @@ export function ProgressCardView({ data }: { data: ProgressCardData | null }) {
           Nothing selected yet
         </p>
       ) : (
-        <>
+        <Card.Content className="space-y-2">
           <p className="text-xl font-semibold tracking-tight text-on-surface">
             {data.title}
           </p>
@@ -89,9 +96,9 @@ export function ProgressCardView({ data }: { data: ProgressCardData | null }) {
               />
             </div>
           </div>
-        </>
+        </Card.Content>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -111,7 +118,7 @@ export function ProgressCard() {
   );
 
   return (
-    <div className="mt-6 w-full max-w-md">
+    <div className="mt-6 w-full max-w-xs">
       <ProgressCardView data={card ?? null} />
     </div>
   );

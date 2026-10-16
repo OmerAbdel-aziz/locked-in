@@ -91,22 +91,70 @@ describe("design tokens", () => {
   });
 });
 
-describe("DESIGN.md binding rules", () => {
-  it("pins the body to the void (#131313) and on-surface text", () => {
+describe("DESIGN.md binding rules (as amended by Phase 3.5)", () => {
+  it("keeps the legacy void + on-surface tokens frozen", () => {
     expect(themeValue("background")).toBe("#131313");
     expect(themeValue("on-surface")).toBe("#e5e2e1");
-
-    // The body rule must actually consume those tokens.
-    expect(css).toMatch(
-      /body\s*\{[^}]*background-color:\s*var\(--color-background\)/,
-    );
-    expect(css).toMatch(/body\s*\{[^}]*color:\s*var\(--color-on-surface\)/);
   });
 
-  it("prevents the white `canvastext` root color under color-scheme: dark", () => {
+  it("renders the body theme-aware with the legacy void as fallback", () => {
+    // Phase 3.5b (PRD D6b) supersedes the dark-only #131313 body: light mode
+    // is first-class, so the body consumes the active HeroUI theme with the
+    // legacy tokens as the pre-theme fallback.
+    expect(css).toMatch(
+      /body\s*\{[^}]*background-color:\s*var\(--background,\s*var\(--color-background\)\)/,
+    );
+    expect(css).toMatch(
+      /body\s*\{[^}]*color:\s*var\(--foreground,\s*var\(--color-on-surface\)\)/,
+    );
+  });
+
+  it("pins text color at the root so no white canvastext leaks through", () => {
     const root = css.match(/:root\s*\{[^}]*\}/)?.[0] ?? "";
-    expect(root).toContain("color-scheme: dark");
-    expect(root).toContain("color: var(--color-on-surface)");
+    expect(root).toContain("color: var(--foreground, var(--color-on-surface))");
+  });
+
+  it("resolves three palettes × light/dark via data-theme", () => {
+    for (const theme of [
+      "mint",
+      "mint-dark",
+      "airbnb",
+      "airbnb-dark",
+      "rabbit",
+      "rabbit-dark",
+    ]) {
+      expect(css).toContain(`[data-theme="${theme}"]`);
+    }
+    // Each dark variant declares a dark scheme; each light one a light scheme.
+    for (const theme of ["mint-dark", "airbnb-dark", "rabbit-dark"]) {
+      const block = css.match(
+        new RegExp(`\\[data-theme="${theme}"\\]\\s*\\{[^}]*\\}`),
+      )?.[0];
+      expect(block).toContain("color-scheme: dark");
+    }
+  });
+
+  it("gives every theme its own two-stop CTA gradient at the fixed 145° geometry", () => {
+    // Geometry never varies (DESIGN.md); the hue follows the theme (PRD D6b).
+    expect(css).toMatch(/@utility cta-gradient[\s\S]*145deg/);
+    expect(css).toContain("--cta-from:");
+    expect(css).toContain("--cta-to:");
+  });
+
+  it("points every font token at JetBrains Mono — no Inter anywhere", () => {
+    for (const token of [
+      "--font-sans",
+      "--font-mono",
+      "--font-headline",
+      "--font-body",
+      "--font-label",
+    ]) {
+      expect(css).toMatch(
+        new RegExp(`${token}:\\s*var\\(--font-jetbrains\\)`),
+      );
+    }
+    expect(cssDecls).not.toMatch(/--font-inter/);
+    expect(cssDecls).not.toMatch(/Inter/);
   });
 
   it("applies the mandated easing curve as a utility", () => {
@@ -120,5 +168,22 @@ describe("DESIGN.md binding rules", () => {
 
   it("keeps 0px as the default radius (no 1px-line habit, DESIGN.md)", () => {
     expect(css).toMatch(/--radius:\s*0\.25rem;/);
+  });
+
+  it("removes HeroUI's tab-list track border, keeping the active indicator", () => {
+    // Audit 2026-10-16: HeroUI draws a full-width `border-b` on every
+    // horizontal tab list plus a separate indicator under the active tab.
+    // The indicator is the design's own affordance; the track is a
+    // sectioning divider under the no-line rule, so it is overridden —
+    // without touching the indicator.
+    expect(css).toMatch(
+      /\.tabs\[data-orientation="horizontal"\]\s*>\s*\.tabs__list-container\s*\{\s*border-bottom-width:\s*0;/,
+    );
+  });
+
+  it("provides a staggered entrance with a reduced-motion fallback", () => {
+    expect(css).toMatch(/\.enter\s*\{[^}]*sanctuary-enter/);
+    expect(css).toMatch(/\.enter-3\s*\{[^}]*animation-delay/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
   });
 });

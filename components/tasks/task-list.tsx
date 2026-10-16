@@ -26,6 +26,7 @@ import { dropNeighbours, type DropPosition } from "@/lib/task-order";
 
 import { TaskInput } from "./task-input";
 import { TaskItem, type TaskRow } from "./task-item";
+import type { PickerProject } from "@/components/projects/picker";
 
 // Re-exported because `tasks` is half of `TaskListProps`: a consumer
 // building a row list should not have to know which file the type was
@@ -34,7 +35,15 @@ export type { TaskRow };
 
 interface TaskListProps<Id extends string> {
   tasks: readonly TaskRow<Id>[];
-  onCreate: (title: string, estimate: number) => void;
+  /**
+   * The picked project travels with the create: `undefined` (or no picker
+   * shown) files the task unassigned, matching the design's untagged row.
+   * Stringly-typed on purpose — this is a *project* id in a component
+   * generic over *task* ids, and threading a second generic through the
+   * list for one optional argument would tax every caller for no safety
+   * the mutation's own validator doesn't already provide.
+   */
+  onCreate: (title: string, estimate: number, projectId?: string) => void;
   onToggle: (id: Id, next: boolean) => void;
   onReorder: (draggedId: Id, afterId: Id | null, beforeId: Id | null) => void;
   onClearCompleted: () => void;
@@ -54,6 +63,16 @@ interface TaskListProps<Id extends string> {
    * dead field is worse than a field that says plainly it is not ready.
    */
   ready?: boolean;
+  /**
+   * Active projects for the add pill's picker (Task 13). Absent — the
+   * default — means no picker: the query hasn't settled (or the caller is a
+   * test that doesn't care), and a picker that can only offer nothing is
+   * worse than none.
+   */
+  projects?: readonly PickerProject[];
+  /** The picker's controlled value; `null` files the next task unassigned. */
+  pickerProjectId?: string | null;
+  onPickerProjectChange?: (id: string | null) => void;
 }
 
 interface Hint<Id extends string> {
@@ -69,6 +88,9 @@ export function TaskList<Id extends string>({
   onClearCompleted,
   onSelect,
   ready = true,
+  projects,
+  pickerProjectId = null,
+  onPickerProjectChange,
 }: TaskListProps<Id>) {
   const [draggedId, setDraggedId] = useState<Id | null>(null);
   const [hint, setHint] = useState<Hint<Id> | null>(null);
@@ -129,7 +151,15 @@ export function TaskList<Id extends string>({
         </span>
       </div>
 
-      <TaskInput onCreate={onCreate} ready={ready} />
+      <TaskInput
+        onCreate={onCreate}
+        ready={ready}
+        projects={projects}
+        projectId={pickerProjectId}
+        onProjectChange={
+          onPickerProjectChange === undefined ? undefined : onPickerProjectChange
+        }
+      />
 
       <div
         role="list"
@@ -157,6 +187,15 @@ export function TaskList<Id extends string>({
           />
         ))}
       </div>
+
+      {/* Calm empty state (audit 2026-10-16): an empty panel is a void
+          with a disabled button in it. One guidance line, no new surface,
+          no fabricated numbers — it leaves with the first task. */}
+      {tasks.length === 0 ? (
+        <p className="rounded-xl bg-surface-container-low/50 px-4 py-6 text-center text-sm text-on-surface-variant/70">
+          No tasks yet — add your first above to start collecting leaves.
+        </p>
+      ) : null}
 
       {/* PRD §4.2's bulk action. Never hidden — an action that disappears
           teaches people it is unreliable — but inert until there is

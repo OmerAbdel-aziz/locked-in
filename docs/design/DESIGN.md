@@ -12,6 +12,7 @@ We use a monochromatic foundation punctuated by a single, high-vibrancy "Teal-Gr
 
 ### Core Palette (Material Design Mapping)
 *   **Background (`#131313`):** The void. Used for the base canvas to minimize eye strain.
+    *   **STALE (2026-10-16, PRD D6b):** The fixed dark-only canvas is superseded — the app now ships three themes (Mint / Airbnb / Rabbit), **each with light and dark mode**, so the base background is a per-theme token, not a fixed `#131313`. `#131313` remains the reference value for the **dark** themes' canvas only.
 *   **Primary (`#4BE277`):** The "Flow State" green. Reserved for active timers and primary actions.
 *   **Surface (`#131313`):** The primary layout container.
 *   **Surface Container Highest (`#353534`):** For active elements or elevated cards.
@@ -77,5 +78,6 @@ A full-screen overlay component that dims all non-essential UI (Task list, Nav, 
 
 ### Don't:
 *   **Don't** use pure white (`#FFFFFF`). It is too aggressive for a "Locked In" focus environment. Use `on-surface` (`#E5E2E1`).
+    *   **STALE (2026-10-16, PRD D6b):** This "no pure white" rule is obsolete now that light mode exists — the light themes legitimately render near-white surfaces (`oklch(100%)` / `oklch(97%)`), and the DOM tests that enforced it are relaxed in light mode. The rule's *intent* still holds where it was written: the **dark** themes should keep the canvas off pure white and use `on-surface` text. Apply this line to dark mode only; it is not a cross-theme invariant.
 *   **Don't** use standard 1px borders to separate the sidebar from the main content. Use a subtle tonal shift between `surface` and `surface-container-low`.
 *   **Don't** use "Alert" colors for errors if possible. Use `tertiary` (muted red/coral) to notify the user without triggering a "panic" response during deep work.

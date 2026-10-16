@@ -14,6 +14,19 @@
  * The viewBox is sized to the ring's canonical 448px (`max-w-md`), so a
  * stroke width of 4 renders as the 4px the design specifies, and scales
  * proportionally at other widths.
+ *
+ * Phase 3.5c evaluation: HeroUI's ProgressCircle was considered — its
+ * Custom-SVG props (viewBox / r / strokeWidth overrides) *can* reproduce
+ * this geometry. Kept hand-written anyway, per the task's own escape clause
+ * (geometry beats library): the idle-full-muted-circle vs. running-gradient
+ * vs. paused-muted-arc three-state semantics have no ProgressCircle
+ * equivalent (its `color` is fixed per instance, and idle-as-a-full-circle
+ * is a design-specific invention), the gradient def + 10%-opacity track are
+ * custom SVG children either way, and its min/max/value percentage model
+ * fights the 0..1 elapsed fraction the engine deals in. Adopting it would
+ * keep every line of custom SVG while adding a wrapper whose value
+ * semantics do not fit. The ring is the app's focal element; it stays
+ * bit-identical.
  */
 
 const SIZE = 448;
