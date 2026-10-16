@@ -1,5 +1,5 @@
 /*
- * The focus screen — Tasks 7 + 10.
+ * The focus screen — Tasks 7, 10 + 12.
  *
  * The left column is the live Timer Engine (ring, readout, controls) bound to
  * the store, and the header tabs switch the engine's phase. The right column
@@ -9,9 +9,6 @@
  * placement matches `screen.png`.
  *
  * Still scaffolding, replaced by their own tasks:
- *   - the summary bento (Task 12, which derives it from the session log)
- *   - the active-task card, which sits under the controls (Task 12; it needs
- *     a bound active task, which is Task 11)
  *   - the streak pill (Task 15, which derives it from the session log)
  *   - the footer chrome (Task 26)
  *
@@ -22,6 +19,8 @@
 
 import { ModeTabs } from "@/components/timer/mode-tabs";
 import { TimerEngine } from "@/components/timer/timer-engine";
+import { ProgressCard } from "@/components/tasks/progress-card";
+import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
 
 export default function Page() {
@@ -41,35 +40,19 @@ export default function Page() {
       </header>
 
       <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-12 gap-12 px-8 pb-20 pt-24">
-        {/* Left column — Timer Engine (live since Task 7). */}
-        <div className="col-span-12 flex items-center justify-center lg:col-span-7">
+        {/* Left column — Timer Engine (live since Task 7) with the
+            active-task card beneath its controls (Task 12). */}
+        <div className="col-span-12 flex flex-col items-center justify-center lg:col-span-7">
           <TimerEngine />
+          <ProgressCard />
         </div>
 
-        {/* Right column — the live task panel (Task 10) above the summary
-            bento (still demo data until Task 12). */}
+        {/* Right column — the live task panel (Task 10) above the live
+            summary bento (Task 12). */}
         <div className="col-span-12 space-y-8 lg:col-span-5">
           <TaskPanel />
           {/* Summary bento — passive readouts, no gate, no celebration. */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-surface-container-low p-6">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Today&apos;s Output
-              </p>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-on-surface">
-                2.0
-                <span className="ml-1 text-base text-on-surface-variant">hrs</span>
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface-container-low p-6">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Focus Score
-              </p>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-primary">
-                50%
-              </p>
-            </div>
-          </div>
+          <SummaryBento />
         </div>
       </main>
 

@@ -2,9 +2,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useQuery } from "convex/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  ProgressCardView,
+  type ProgressCardData,
+} from "@/components/tasks/progress-card";
 import { TaskList, type TaskRow } from "@/components/tasks/task-list";
 import { DEFAULT_ESTIMATE } from "@/components/tasks/task-input";
 import { TaskPanel, toTaskRows } from "@/components/tasks/task-panel";
+import {
+  SummaryBentoView,
+  type SummaryData,
+} from "@/components/tasks/summary-bento";
 import { dropNeighbours } from "@/lib/task-order";
 
 /**
@@ -586,6 +594,177 @@ describe("toTaskRows", () => {
     expect(
       toTaskRows({ active: [], completed: [] }),
     ).toEqual([]);
+  });
+});
+
+describe("the active-task card (PRD §4.1 'Session progress')", () => {
+  const card: ProgressCardData = {
+    taskId: "a",
+    title: "Draft the outline",
+    estimate: 8,
+    leaves: 4,
+  };
+
+  it("shows the selected task's title, leaves and estimate", () => {
+    render(<ProgressCardView data={card} />);
+
+    expect(screen.getByText("Draft the outline")).toBeTruthy();
+    // The design's own wording, "4 / 8 Pomodoros" — leaves against the
+    // estimate, which is the acceptance criterion in the card's own words.
+    expect(screen.getByText(/4 \/ 8 Pomodoros/)).toBeTruthy();
+    expect(screen.getByText("Currently Active")).toBeTruthy();
+  });
+
+  it("fills the bar by the ratio, and never past the end", () => {
+    const { container } = render(<ProgressCardView data={card} />);
+    const bar = container.querySelector(
+      '[style*="width"]',
+    ) as unknown as HTMLElement;
+
+    expect(bar.style.width).toBe("50%");
+
+    // A task may outrun its estimate — a finished task keeps receiving
+    // focus time until another is selected — and the bar's own extent may
+    // not, or the track would be overrun by the thing it measures.
+    cleanup();
+    const { container: over } = render(
+      <ProgressCardView data={{ ...card, leaves: 5, estimate: 2 }} />,
+    );
+    const overBar = over.querySelector(
+      '[style*="width"]',
+    ) as unknown as HTMLElement;
+    expect(overBar.style.width).toBe("100%");
+    // The text still tells the truth about the overrun: 5 of 2 is real.
+    expect(screen.getByText(/5 \/ 2 Pomodoros/)).toBeTruthy();
+  });
+
+  it("fills nothing for a task with no estimate to be against", () => {
+    const { container } = render(
+      <ProgressCardView data={{ ...card, leaves: 3, estimate: 0 }} />,
+    );
+    const bar = container.querySelector(
+      '[style*="width"]',
+    ) as unknown as HTMLElement;
+
+    // "3 / 0 Pomodoros" is an honest answer to a task the user chose to
+    // leave unestimated; a 100%-full bar would be a celebration of it.
+    expect(screen.getByText(/3 \/ 0 Pomodoros/)).toBeTruthy();
+    expect(bar.style.width).toBe("0%");
+  });
+
+  it("says nothing is selected instead of inventing a card", () => {
+    const { container } = render(<ProgressCardView data={null} />);
+
+    expect(screen.getByText("Nothing selected yet")).toBeTruthy();
+    expect(screen.queryByText(/Pomodoros/)).toBeNull();
+    // No bar and no title — the two things a fabricated card would have to
+    // make up. And the dot stops pulsing: nothing is live.
+    expect(container.querySelector('[style*="width"]')).toBeNull();
+    expect(container.querySelector(".animate-pulse")).toBeNull();
+  });
+
+  it("is the design's glass card, not a bordered box", () => {
+    const { container } = render(<ProgressCardView data={card} />);
+
+    // `glass-panel` is DESIGN.md §2's "Glass & Gradient" rule: surface at
+    // 60% with a 20px backdrop blur, for things that float.
+    expect(container.querySelector(".glass-panel")).toBeTruthy();
+
+    // The one border it carries is the design's own ghost border —
+    // `outline-variant` at 10%, "felt rather than seen" (DESIGN.md §4) —
+    // around a single card, never a line sectioning the page off.
+    const classes = allClasses(container);
+    expect(
+      classes.filter((name) => /^border-(t|b|x|y)(-|$)/.test(name)),
+    ).toEqual([]);
+    expect(classes.some((name) => /^border-/.test(name))).toBe(true);
+  });
+});
+
+describe("the Summary bento (PRD §4.1 'Summary bento')", () => {
+  const summary: SummaryData = {
+    focusMinutes: 125,
+    completedLeaves: 2,
+    estimatedLeaves: 3,
+  };
+
+  it("reports today's focus time in hours, to one decimal", () => {
+    render(<SummaryBentoView summary={summary} />);
+
+    // 125 minutes is 2.08 hours — the design's "4.2 hrs" shape, so the
+    // readout never pretends to a precision the sessions do not have.
+    expect(screen.getByText("2.1")).toBeTruthy();
+    expect(screen.getByText("hrs")).toBeTruthy();
+  });
+
+  it("rounds the completion ratio to a whole percent", () => {
+    render(<SummaryBentoView summary={summary} />);
+
+    // 2 of 3 is 66.7% — rounded, because "66.67%" is precision the count
+    // of sessions cannot carry.
+    expect(screen.getByText("67%")).toBeTruthy();
+  });
+
+  it("reports no ratio at all when there is no estimate to divide by", () => {
+    render(
+      <SummaryBentoView
+        summary={{ focusMinutes: 50, completedLeaves: 2, estimatedLeaves: 0 }}
+      />,
+    );
+
+    // "0%" would read as a failure of a question nobody asked: an empty
+    // board is not a score of zero, it is no score (PRD §4.1 — passive
+    // readout, no threshold state).
+    expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.queryByText(/%/)).toBeNull();
+  });
+
+  it("is calm for a brand-new account — no fabricated numbers", () => {
+    render(
+      <SummaryBentoView
+        summary={{ focusMinutes: 0, completedLeaves: 0, estimatedLeaves: 0 }}
+      />,
+    );
+
+    expect(screen.getByText("0.0")).toBeTruthy();
+    expect(screen.getByText("—")).toBeTruthy();
+  });
+
+  it("never grades the number it is showing", () => {
+    // PRD §4.1's "no color-coded pass/fail", asserted as the invariant that
+    // actually matters: the score's colour does not vary with its value. A
+    // red-for-low implementation passes every other test in this file.
+    const { container: empty } = render(
+      <SummaryBentoView
+        summary={{ focusMinutes: 0, completedLeaves: 0, estimatedLeaves: 0 }}
+      />,
+    );
+    const { container: full } = render(
+      <SummaryBentoView
+        summary={{ focusMinutes: 600, completedLeaves: 10, estimatedLeaves: 10 }}
+      />,
+    );
+
+    const scoreClass = (container: HTMLElement) =>
+      [...container.querySelectorAll("p")]
+        .find((p) => p.className.includes("text-primary"))?.className ?? "";
+
+    // One green at "—" and the same green at "100%": the design's own
+    // markup paints it `primary` at every value, and that constancy is the
+    // whole claim.
+    expect(scoreClass(empty)).toBe(scoreClass(full));
+    expect(scoreClass(full)).toContain("text-primary");
+  });
+
+  it("sections with tonal shifts, never a divider line", () => {
+    const { container } = render(<SummaryBentoView summary={summary} />);
+    const classes = allClasses(container);
+
+    expect(
+      classes.filter((name) => /^border-(t|b|x|y)(-|$)/.test(name)),
+    ).toEqual([]);
+    expect(classes.filter((name) => name.startsWith("divide-"))).toEqual([]);
+    expect(container.querySelector("hr")).toBeNull();
   });
 });
 

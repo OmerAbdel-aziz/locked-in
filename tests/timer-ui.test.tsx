@@ -404,15 +404,31 @@ describe("DESIGN.md's binding rules hold in the rendered output", () => {
 
     expect(onePixelLines).toEqual([]);
 
-    // Bare `border` (also 1px by default) is §5's *permitted* case: "a 1px
-    // solid border is reserved for interactive affordances such as inputs."
-    // In this app that is the task row's checkbox — the design's own markup
-    // draws it with `border border-outline-variant` — and nothing else.
+    // Bare `border` (also 1px by default) has exactly two sanctioned shapes
+    // in this app, and anything else fails:
+    //
+    //   1. **An interactive affordance.** §5 reserves the solid 1px border
+    //      for things like inputs; here that is the task row's checkbox,
+    //      which the design's own markup draws with `border
+    //      border-outline-variant`.
+    //   2. **§4's ghost border** — `outline-variant` at a few percent
+    //      opacity, "a suggestion of a border, felt rather than seen", which
+    //      `code.html` itself draws around the active-task card (/10) and
+    //      each bento tile (/5). It is the design's tonal treatment of a
+    //      *floating card*, not a line sectioning the page: the test's
+    //      first half still forbids every directional border, and a bare
+    //      `border` in any other colour — or in the ghost colour at a
+    //      strength DESIGN.md does not sanction (>15%) — fails here.
     const bareBorders = Array.from(container.querySelectorAll("*")).filter(
       (el) => el.classList.contains("border"),
     );
     const notAffordances = bareBorders.filter(
-      (el) => el.getAttribute("role") !== "checkbox",
+      (el) =>
+        el.getAttribute("role") !== "checkbox" &&
+        !Array.from(el.classList).some((cls) => {
+          const ghost = /^border-outline-variant\/(\d+)$/.exec(cls);
+          return ghost !== null && Number(ghost[1]) <= 15;
+        }),
     );
 
     expect(

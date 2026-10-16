@@ -538,16 +538,156 @@ export const leafCounts = query({
 
     const counts: Record<string, number> = {};
     for (const task of tasks) {
-      const focus = await ctx.db
-        .query("sessions")
-        .withIndex("by_owner_task", (q) =>
-          q.eq("ownerId", ownerId).eq("taskId", task._id),
-        )
-        .filter((q) => q.eq(q.field("phase"), "focus"))
-        .collect();
-      counts[task._id] = focus.length;
+      counts[task._id] = await focusLeafCount(ctx, ownerId, task._id);
     }
 
     return counts;
+  },
+});
+
+/**
+ * How many focus sessions the log has credited to one task — the single
+ * definition of "leaf" the panel and the active-task card both read, so the
+ * two can never disagree about the same number.
+ *
+ * Hoisted rather than shared through a module const because both callers
+ * above and below need it; see `leafCounts` for why the index looks like
+ * this and why break rows are discarded in memory.
+ */
+async function focusLeafCount(
+  ctx: QueryCtx,
+  ownerId: Id<"users">,
+  taskId: Id<"tasks">,
+): Promise<number> {
+  const focus = await ctx.db
+    .query("sessions")
+    .withIndex("by_owner_task", (q) =>
+      q.eq("ownerId", ownerId).eq("taskId", taskId),
+    )
+    .filter((q) => q.eq(q.field("phase"), "focus"))
+    .collect();
+
+  return focus.length;
+}
+
+/**
+ * The active-task card's readout — Task 12, PRD §4.1's "Session progress".
+ *
+ * One query for one card: title, estimate and leaf count for whatever the
+ * user has selected. It hides a dead pointer exactly as `activeTask` does —
+ * a task deleted from another tab answers "nothing selected" rather than
+ * drawing a card for a row that no longer exists — and refuses a foreign
+ * task through the same ownership question everything else asks.
+ */
+export const progressCard = query({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await resolveOwner(ctx);
+
+    const user = await ctx.db.get(ownerId);
+    const taskId = user?.activeTaskId;
+    if (taskId === undefined) {
+      return null;
+    }
+
+    const task = await ctx.db.get(taskId);
+    if (task === null || task.ownerId !== ownerId) {
+      return null;
+    }
+
+    return {
+      taskId,
+      title: task.title,
+      estimate: task.estimate,
+      leaves: await focusLeafCount(ctx, ownerId, taskId),
+    };
+  },
+});
+
+/** Minutes in a day, and milliseconds in a minute — the two units here. */
+const MS_PER_MINUTE = 60_000;
+const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
+
+/**
+ * The UTC instant at which the given local calendar day began.
+ *
+ * `offsetMinutes` is `-new Date().getTimezoneOffset()` from the device —
+ * positive east of Greenwich. PRD D5 fixes "day" to the *device's* local
+ * midnight, and the server has no idea where the device is, so the offset
+ * arrives as an argument. It is data about a clock, not an assertion of
+ * identity: the only thing a wrong value can distort is which of the user's
+ * own days one of their own rows lands in, and the next load corrects it.
+ *
+ * The shift happens **before** the floor, not after: a device at UTC-5
+ * reading 01:00Z is living in *yesterday's* evening, so its day began at
+ * the previous UTC midnight — flooring the raw UTC instant first would
+ * name tomorrow's local midnight and put the window's whole start four
+ * hours in the future. (That version passes every afternoon case and fails
+ * every morning one, which is exactly what the boundary test pins.)
+ *
+ * A session ending 00:01 local therefore belongs to the day that is
+ * beginning, not to the one that is ending — the edge the schema's
+ * `tzOffsetAtCompletion` comment exists to protect.
+ */
+export function startOfLocalDay(now: number, offsetMinutes: number): number {
+  const offsetMs = offsetMinutes * MS_PER_MINUTE;
+  const localNow = now + offsetMs;
+  return Math.floor(localNow / MS_PER_DAY) * MS_PER_DAY - offsetMs;
+}
+
+/**
+ * The Summary bento's two passive readouts — Task 12, PRD §4.1.
+ *
+ * Both are derived here and stored nowhere (ADR-003): today's focus time
+ * from the log's focus rows, today's estimate from the board the user can
+ * actually see. Scoping the denominator to the *current* board rather than
+ * to "tasks with a session today" is the only durable reading — a session
+ * row snapshots the task's identity, never its estimate, so a cleared task
+ * would otherwise take its denominator with it and silently raise the score.
+ *
+ * The range scan is the one the schema was built around: `by_owner_completed`
+ * from the day's start, so the query reads *today's* rows and nothing else.
+ */
+export const todaySummary = query({
+  args: {
+    /**
+     * The device's UTC offset in minutes, as `-new Date().getTimezoneOffset()`
+     * reports it. See `startOfLocalDay`.
+     */
+    tzOffsetMinutes: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+
+    const dayStart = startOfLocalDay(Date.now(), args.tzOffsetMinutes);
+
+    const focus = await ctx.db
+      .query("sessions")
+      .withIndex("by_owner_completed", (q) =>
+        q.eq("ownerId", ownerId).gte("completedAt", dayStart),
+      )
+      .filter((q) => q.eq(q.field("phase"), "focus"))
+      .collect();
+
+    let focusMs = 0;
+    for (const session of focus) {
+      focusMs += session.completedAt - session.startedAt;
+    }
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(LIST_LIMIT);
+
+    let estimatedLeaves = 0;
+    for (const task of tasks) {
+      estimatedLeaves += task.estimate;
+    }
+
+    return {
+      focusMinutes: focusMs / MS_PER_MINUTE,
+      completedLeaves: focus.length,
+      estimatedLeaves,
+    };
   },
 });
