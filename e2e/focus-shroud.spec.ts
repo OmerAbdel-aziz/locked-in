@@ -32,6 +32,12 @@ test.describe("Focus Shroud", () => {
     // The engine stays above the veil (z-50) so digits/controls keep working.
     const engine = page.getByRole("region", { name: "Timer engine" });
     await expect(engine).toHaveClass(/z-50/);
+    // The whole left column rises above the root-level veil — the engine's
+    // own z-50 is trapped by the column's entrance-animation stacking context
+    // (regression 2026-10-16: timer rendered dimmed under its own veil).
+    const column = page.getByTestId("shroud-column");
+    await expect(column).toHaveAttribute("data-shroud-elevated", "true");
+    await expect(column).toHaveClass(/z-50/);
   });
 
   test("veil auto-dismisses when the focus phase ends via Skip", async ({

@@ -25,7 +25,7 @@ import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
 import { StatusFooter } from "@/components/chrome/status-footer";
 import { AccountButton } from "@/components/auth/account-button";
-import { FocusShroud, ShroudToggle } from "@/components/shroud/focus-shroud";
+import { FocusShroud, ShroudColumn, ShroudToggle } from "@/components/shroud/focus-shroud";
 
 export default function Page() {
   return (
@@ -68,11 +68,11 @@ export default function Page() {
             `min-w-0`: grid/flex items refuse to shrink below their content
             otherwise, and the ring column overflowed 390px viewports
             (audit 2026-10-16). */}
-        <div className="enter col-span-12 flex min-w-0 flex-col items-center justify-center lg:col-span-7">
+        <ShroudColumn className="enter col-span-12 flex min-w-0 flex-col items-center justify-center lg:col-span-7">
           <TimerEngine />
           <ProgressCard />
           <ShroudToggle />
-        </div>
+        </ShroudColumn>
 
         {/* Right column — the live task panel (Task 10) above the live
             summary bento (Task 12). Entrances stagger after the engine. */}

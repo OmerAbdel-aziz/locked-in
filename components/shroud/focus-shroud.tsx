@@ -111,3 +111,36 @@ export function ShroudToggle() {
     </button>
   );
 }
+
+/**
+ * The left-column wrapper — Task 18 fix (2026-10-16).
+ *
+ * The veil sits at root-level `z-40`, but the column carries the `.enter`
+ * entrance animation whose `both` fill mode retains `translateY(0)` forever —
+ * a permanent stacking context that traps any `z-index` set *inside* the
+ * column (the engine section / card wrapper `z-50` from the first pass never
+ * escaped it, so the timer rendered dimmed under its own veil). The elevation
+ * therefore belongs here, on the column itself: `main` and the page root are
+ * unpositioned and create no stacking contexts, so this one positioned
+ * ancestor compares against the veil at the root level and wins. The column
+ * holds exactly the stay-visible surfaces (engine, active-task card, toggle);
+ * header nav, task column, bento and footer keep their natural level and dim.
+ */
+export function ShroudColumn({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}) {
+  const active = useShroudActive();
+  return (
+    <div
+      data-testid="shroud-column"
+      data-shroud-elevated={active ? "true" : "false"}
+      className={`${className} ${active ? "relative z-50" : ""}`}
+    >
+      {children}
+    </div>
+  );
+}

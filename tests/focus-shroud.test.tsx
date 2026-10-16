@@ -154,6 +154,27 @@ describe("the veil", () => {
 });
 
 describe("timer + active task stay above the veil", () => {
+  it("elevates the whole left column above the root-level veil while active", () => {
+    // Regression (2026-10-16): the column carries the `.enter` animation,
+    // whose fill mode is a permanent stacking context — the engine/card
+    // `z-50` set inside it never escaped, and the timer rendered dimmed
+    // under its own veil. The elevation lives on the column itself, which
+    // compares against the veil at the root level.
+    render(<Page />);
+    const column = screen.getByTestId("shroud-column");
+    expect(column.getAttribute("data-shroud-elevated")).toBe("false");
+    expect(column.className).not.toContain("z-50");
+
+    act(() => useTimerStore.getState().start());
+    expect(column.getAttribute("data-shroud-elevated")).toBe("true");
+    expect(column.className).toContain("relative");
+    expect(column.className).toContain("z-50");
+
+    act(() => useTimerStore.getState().skip());
+    expect(column.getAttribute("data-shroud-elevated")).toBe("false");
+    expect(column.className).not.toContain("z-50");
+  });
+
   it("elevates the engine section to z-50 only while the shroud is up", () => {
     render(<TimerEngine />);
     const section = screen.getByRole("region", { name: "Timer engine" });
