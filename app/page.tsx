@@ -36,8 +36,23 @@ export default function Page() {
         <ModeTabs />
 
         {/* Task 15: derived from the session log, never stored (ADR-003).
-            Task 16's dialog sits beside it — both are header chrome. */}
+            Task 16's dialog sits beside it — both are header chrome.
+            The Focus/Stats nav (Task 20) rides in the same cluster. */}
         <div className="flex items-center gap-2">
+          <nav className="flex items-center gap-1 rounded-full bg-surface-container-low/60 p-1 text-xs font-semibold">
+            <span
+              aria-current="page"
+              className="rounded-full bg-surface-container-highest px-3 py-1 text-on-surface"
+            >
+              Focus
+            </span>
+            <a
+              href="/stats"
+              className="rounded-full px-3 py-1 text-on-surface-variant"
+            >
+              Stats
+            </a>
+          </nav>
           <StreakBadge />
           <SettingsDialog />
         </div>
