@@ -17,6 +17,7 @@ import {
   type TimerStatus,
 } from "@/lib/pomodoro";
 import { useCountdown, usePhaseCompletion, useTimerStore } from "@/lib/store/timer";
+import { useShroudActive } from "@/components/shroud/focus-shroud";
 
 import { ProgressRing, type RingVariant } from "./progress-ring";
 import { TimerControls } from "./timer-controls";
@@ -45,11 +46,16 @@ export function TimerEngine() {
 
   const total = durationMs(state.phase, settings);
   const progress = total > 0 ? 1 - remaining / total : 0;
+  // The shroud veil sits at z-40; while it is up, the engine rises above it
+  // so the digits, ring and controls stay visible and interactive (Task 18).
+  const shroudActive = useShroudActive();
 
   return (
     <section
       aria-label="Timer engine"
-      className="flex w-full max-w-xs min-w-0 flex-col items-center justify-center"
+      className={`flex w-full max-w-xs min-w-0 flex-col items-center justify-center ${
+        shroudActive ? "relative z-50" : ""
+      }`}
     >
       {/* `@container` so the readout can size itself to the ring rather than
           to the viewport — the digits nest inside the circle at every width

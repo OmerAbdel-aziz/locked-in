@@ -25,6 +25,7 @@ import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
 import { StatusFooter } from "@/components/chrome/status-footer";
 import { AccountButton } from "@/components/auth/account-button";
+import { FocusShroud, ShroudToggle } from "@/components/shroud/focus-shroud";
 
 export default function Page() {
   return (
@@ -70,6 +71,7 @@ export default function Page() {
         <div className="enter col-span-12 flex min-w-0 flex-col items-center justify-center lg:col-span-7">
           <TimerEngine />
           <ProgressCard />
+          <ShroudToggle />
         </div>
 
         {/* Right column — the live task panel (Task 10) above the live
@@ -87,6 +89,9 @@ export default function Page() {
 
       {/* Live footer chrome (PRD §4.1): real local time + connection. */}
       <StatusFooter />
+      {/* Task 18: the veil renders last so it covers nav, columns and footer;
+          the engine + card rise above it via their own z-50 (see above). */}
+      <FocusShroud />
     </div>
   );
 }

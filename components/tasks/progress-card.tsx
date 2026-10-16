@@ -24,6 +24,7 @@ import { useQuery } from "convex/react";
 import { Card } from "@heroui/react";
 
 import { api } from "@/convex/_generated/api";
+import { useShroudActive } from "@/components/shroud/focus-shroud";
 
 export interface ProgressCardData {
   taskId: string;
@@ -116,9 +117,16 @@ export function ProgressCard() {
     // owner cannot be issued before there is a session to resolve one from.
     isAuthenticated ? {} : "skip",
   );
+  // Task 18: the card is the "current active task" DESIGN.md keeps above the
+  // veil, so it rises with the engine while the shroud is up.
+  const shroudActive = useShroudActive();
 
   return (
-    <div className="mt-6 w-full max-w-xs">
+    <div
+      className={`mt-6 w-full max-w-xs ${shroudActive ? "relative z-50" : ""}`}
+      data-testid="progress-card-wrap"
+      data-shroud-elevated={shroudActive ? "true" : "false"}
+    >
       <ProgressCardView data={card ?? null} />
     </div>
   );

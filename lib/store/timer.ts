@@ -124,6 +124,18 @@ export interface TimerStore {
   dismissNotice: () => void;
 
   /**
+   * The Focus Shroud toggle — Task 18.
+   *
+   * Display-only, like `notificationsEnabled`: the engine never reads it, so
+   * it lives beside the state rather than inside it and the equivalence test
+   * is unaffected. Default ON; the veil itself is still gated on a running
+   * focus phase (see `shouldShroudActive`), so this is a preference, not a
+   * second source of truth for whether a session is running.
+   */
+  shroudEnabled: boolean;
+  setShroudEnabled: (enabled: boolean) => void;
+
+  /**
    * The selection — which task the *next* phase to begin will bind to
    * (PRD §4.1). Fed by the panel, the one place that knows both the id and
    * the project the task is filed under.
@@ -240,6 +252,7 @@ export const useTimerStore = create<TimerStore>((set, get) => {
     state: initialTimerState(),
     settings: DEFAULT_SETTINGS,
     notificationsEnabled: true,
+    shroudEnabled: true,
 
     phaseNotice: null,
     dismissNotice: () => set({ phaseNotice: null }),
@@ -257,6 +270,8 @@ export const useTimerStore = create<TimerStore>((set, get) => {
 
     setNotificationsEnabled: (notificationsEnabled) =>
       set({ notificationsEnabled }),
+
+    setShroudEnabled: (shroudEnabled) => set({ shroudEnabled }),
 
     start: () => {
       // Task 17: the one and only permission prompt. It runs from the Start

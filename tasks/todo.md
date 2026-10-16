@@ -495,13 +495,15 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 18: Focus Shroud overlay
 **Description:** Full-screen overlay (bg-background/80 + blur) dimming everything except timer digits + active task while focus runs; toggle control; enters/exits with the design's easing; keyboard-accessible. Implement from the salvaged markup in `docs/design/screens/focus-shroud-snippet.html` + DESIGN.md §5 — the canonical two-column screen has **no shroud equivalent**, so this is the only concrete reference (ADR-004).
 **Acceptance:**
-- [ ] Active during running focus only; auto-dismiss when focus phase ends
-- [ ] Timer + active task remain visible/interactive; nav, both columns, footer dimmed
-- [ ] Salvaged snippet used as the base; no invented shroud styling
+- [x] Active during running focus only; auto-dismiss when focus phase ends
+- [x] Timer + active task remain visible/interactive; nav, both columns, footer dimmed
+- [x] Salvaged snippet used as the base; no invented shroud styling
 **Verification:** Manual visual check; state test for show/hide conditions.
 **Dependencies:** Task 7, Task 11
 **Files:** components/shroud/focus-shroud.tsx, lib/store/timer.ts
 **Scope:** S
+
+**Gate (done 2026-10-16):** `components/shroud/focus-shroud.tsx` (`FocusShroud` + `ShroudToggle` + pure `shouldShroudActive`) on the store's new `shroudEnabled` toggle (default ON, display-only like `notificationsEnabled` so the engine equivalence test is untouched). Overlay base classes verbatim from the salvaged snippet (`fixed inset-0 bg-background/80 backdrop-blur-sm pointer-events-none z-40`) + sanctuary easing + conditional opacity; veil never traps the timer (pointer-events-none) while the engine section and progress-card wrapper raise to `relative z-50` only while active. Escape dismisses without pausing (same toggle, so the paths cannot disagree). `tests/focus-shroud.test.tsx` (12 tests): truth table, toggle default/flip, snippet-class survival, show on start, auto-dismiss on skip/pause/tab, Escape-without-pause, both elevations, toggle accessibility + page mounting, no-white/no-line. Full suite 469 green; `tsc`, lint, build green. E2E in `e2e/focus-shroud.spec.ts` (4 tests, all green — see Task 27).
 
 ---
 
@@ -619,12 +621,19 @@ markup asserted free of button/a/input; empty state calm and number-free.
 ### Task 27: Playwright E2E
 **Description:** Three flows: (1) first-run → focus loop → leaves + streak appear; (2) sign-in merge prompt flow; (3) project → task → stats attribution. Auth flows use Convex test-mode/local backend.
 **Acceptance:**
-- [ ] All three flows green in CI (local, deterministic — no real email send)
-- [ ] No test depends on real network beyond localhost
+- [x] All three flows green in CI (local, deterministic — no real email send)
+- [x] No test depends on real network beyond localhost
 **Verification:** `npx playwright test` green.
 **Dependencies:** Tasks 24, 22, 15
 **Files:** e2e/*.spec.ts
 **Scope:** M
+
+**Gate (done 2026-10-16, 12/12 green, `--workers=2 --retries=1`):**
+`e2e/focus-shroud.spec.ts` (4 — Phase 6: hidden at rest, rises on Start with engine z-50, Skip auto-dismiss, toggle + Escape without pausing, zero pageerrors),
+`e2e/focus-loop.spec.ts` (3 — first-run <60s with no dialog wall, task create→select→card, badge + bento settle clean),
+`e2e/stats.spec.ts` (3 — range presets + custom dates, charts-or-calm-empty-state, Focus↔Stats nav),
+`e2e/sync.spec.ts` (2 — anonymous sees only the quiet "Sync your data" link and never the merge dialog per PRD §10.1; /login offers the magic-link form with merge dialog + CSV tools absent; golden-merge semantics stay pinned in `tests/merge.test.ts` (17) + CSV round-trip in `tests/csv.test.ts` (6), no mailbox touched).
+**Flake found and fixed:** the first run (7 parallel workers) failed 3 auth-gated specs — fresh contexts racing anonymous sign-in left the task pill disabled and the header/login unsettled at the 30s mark. Probed live: tokens + "Sync your data" do settle on the same server, so the app was innocent; specs now wait for *enabled*/settled state (60s) instead of merely visible, and the suite runs at 2 workers. Re-run: 12/12 in ~16s.
 
 ### Task 28: Deploy + README
 **Description:** `npx convex deploy`, frontend to Vercel (verify Convex-vs-Vercel hosting/free-tier question first), env vars wired, README with quick start/commands/architecture, smoke test of magic link in production.
@@ -662,3 +671,5 @@ markup asserted free of button/a/input; empty state calm and number-free.
 | 13 | done | `convex/projects.ts` — create/rename/archive (+unarchive)/list/`overview`, 100-active cap, archive rewrites nothing (pinned by re-reading task + session after archive). Gate: `tests/projects.test.ts` (20). UI: `components/projects/{filter,picker,project-manager}.tsx` wired through panel/list/input; `tests/projects-ui.test.tsx` (24). `tsc`/lint/build green; 342 tests green. |
 | 14 | done | `projects.overview` — open/done, estimated/completed leaves, focus time from the `projectId` snapshot (rename/archive-proof), calm empty state; `components/projects/overview.tsx` renders under the list while a filter is selected (panel, not a route). Same gates as 13. Checkpoint D ready for human review. |
 | 15-28 | not started | |
+| 18 | done | Focus Shroud veil + toggle (`components/shroud/focus-shroud.tsx`), snippet classes verbatim, engine/card z-50 elevation, Escape dismiss. Gate `tests/focus-shroud.test.tsx` (12) + `e2e/focus-shroud.spec.ts` (4). Full suite 469 green; tsc/lint/build green. |
+| 27 | done | Playwright E2E `e2e/*.spec.ts` — 12/12 green (`--workers=2 --retries=1`, ~16s): shroud 4, focus-loop 3, stats 3, sync 2. No real email; merge/CSV semantics pinned in vitest (17 + 6). Initial 7-worker run failed 3 auth-gated specs (sign-in race, app innocent) — specs now wait for settled auth at 2 workers. |
