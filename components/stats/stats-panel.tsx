@@ -10,16 +10,18 @@
  * sees whenever the range holds no sessions.
  *
  * Two clock rules, both inherited:
- *   - `now` arrives via `useSyncExternalStore` (server snapshot `0`, never
- *     used for a query) because Next 16's `blocking-prerender-current-time`
- *     rejects clock reads during client render — the same rule that shaped
- *     `useCountdown` (Task 7) and `useTzOffsetMinutes` (Task 12).
+ *   - `now` arrives via the shared `useNow` hook (`lib/use-now.ts`):
+ *     `useSyncExternalStore` with a minute-quantised snapshot (server `0`),
+ *     because Next 16's `blocking-prerender-current-time` rejects clock
+ *     reads during client render — the same rule that shaped `useCountdown`
+ *     (Task 7) and `useTzOffsetMinutes` (Task 12). The quantisation is
+ *     load-bearing: an unquantised snapshot re-renders forever.
  *   - The auth gate mirrors `task-panel.tsx`: `useConvexAuth` from
  *     `@convex-dev/auth/react` (not `convex/react`), and Convex's `"skip"`
  *     literal until the anonymous session exists.
  */
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 
@@ -31,6 +33,7 @@ import {
   presetRange,
   type RangePreset,
 } from "@/lib/aggregations";
+import { useNow } from "@/lib/use-now";
 import { useTzOffsetMinutes } from "@/lib/use-tz-offset";
 
 import { PerProjectView, TopTasksView } from "./breakdown";
@@ -41,14 +44,6 @@ import { SessionHistoryView } from "./session-history";
 import { SessionsChartView } from "./sessions-chart";
 import { TimeOfDayView } from "./time-of-day";
 import { TrendsView } from "./trends";
-
-function useNow(): number {
-  return useSyncExternalStore(
-    () => () => {},
-    () => Date.now(),
-    () => 0,
-  );
-}
 
 export function StatsPanel() {
   const { isAuthenticated } = useConvexAuth();

@@ -1,11 +1,13 @@
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { render } from "@testing-library/react";
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import schema from "@/convex/schema";
+import { useNow } from "@/lib/use-now";
 import {
   aggregateRange,
   computeBarHeights,
@@ -421,6 +423,30 @@ describe("chart scaling", () => {
 
   it("renders an all-zero series flat instead of dividing by zero", () => {
     expect(computeBarHeights([0, 0, 0], 100)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("useNow stability (Task 20 hotfix)", () => {
+  it("returns a clock snapshot that is stable across renders", () => {
+    // A clock advancing 1ms per read: an unquantised snapshot would hand
+    // React a new value on every render, and each render would schedule
+    // another — the "Maximum update depth exceeded" spiral seen live on
+    // `/stats`. Flooring to the minute keeps thousands of reads on one
+    // value, so re-renders settle instead of looping.
+    let tick = at(2024, 6, 15, 13, 0);
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => tick++);
+    try {
+      function Probe() {
+        return h("span", null, String(useNow()));
+      }
+      const { container, rerender } = render(h(Probe, {}));
+      const first = container.textContent;
+      rerender(h(Probe, {}));
+      expect(container.textContent).toBe(first);
+      expect(first).toBe(String(at(2024, 6, 15, 13, 0)));
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 
