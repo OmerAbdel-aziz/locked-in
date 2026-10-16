@@ -24,6 +24,7 @@ import { ProgressCard } from "@/components/tasks/progress-card";
 import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
 import { StatusFooter } from "@/components/chrome/status-footer";
+import { AccountButton } from "@/components/auth/account-button";
 
 export default function Page() {
   return (
@@ -37,7 +38,8 @@ export default function Page() {
 
         {/* Task 15: derived from the session log, never stored (ADR-003).
             Task 16's dialog sits beside it — both are header chrome.
-            The Focus/Stats nav (Task 20) rides in the same cluster. */}
+            The Focus/Stats nav (Task 20) rides in the same cluster.
+            Task 23's account entry joins the cluster (never a prompt). */}
         <div className="flex items-center gap-2">
           <nav className="flex items-center gap-1 rounded-full bg-surface-container-low/60 p-1 text-xs font-semibold">
             <span
@@ -55,6 +57,7 @@ export default function Page() {
           </nav>
           <StreakBadge />
           <SettingsDialog />
+          <AccountButton />
         </div>
       </header>
 
