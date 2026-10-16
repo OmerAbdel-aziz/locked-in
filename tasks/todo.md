@@ -510,42 +510,59 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 19: Aggregation functions
 **Description:** `lib/aggregations.ts` + Convex query wrappers: focus/sessions per day, break-vs-focus split, per-project focus time, top tasks by focus time, completion ratio — all range-parameterized (today/7/30/custom), derived from session log with bounded indexes.
 **Acceptance:**
-- [ ] 30-day fixture dataset matches a hand-computed oracle (PRD §10.8)
-- [ ] No client-side full-log scans — queries range-bounded server-side
+- [x] 30-day fixture dataset matches a hand-computed oracle (PRD §10.8)
+- [x] No client-side full-log scans — queries range-bounded server-side
 **Verification:** Oracle test in CI.
 **Dependencies:** Task 3, Task 8
 **Files:** lib/aggregations.ts, convex/stats.ts, tests/aggregations.test.ts
 **Scope:** M
 
+**Gate (done 2026-10-16, merge `51440e4`):** `tests/aggregations.test.ts` (37 tests)
+pins one hand-computed 30-day fixture down both paths — pure helpers and
+`convex/stats.ts` (`rangeStats`/`history` over `by_owner_completed`
+`[start, end)`, plus one equal-length preceding scan for trends).
+
 ### Task 20: /stats page — range selector + charts
 **Description:** New route `/stats` (nav link from header): range selector, focus-time bar chart + sessions chart in hand-rolled SVG matching DESIGN.md (primary-gradient bars, no axes chrome, no lines).
 **Acceptance:**
-- [ ] Charts render correct relative heights from fixture data (no library)
-- [ ] DESIGN.md no-line/palette rules hold on the page
+- [x] Charts render correct relative heights from fixture data (no library)
+- [x] DESIGN.md no-line/palette rules hold on the page
 **Verification:** Snapshot/oracle test on SVG bar heights; visual check.
 **Dependencies:** Task 19, Task 2
 **Files:** app/stats/page.tsx, components/stats/*.tsx
 **Scope:** M
 
+**Gate (done 2026-10-16):** bar heights asserted via `computeBarHeights` +
+`data-bar-height` markup oracle; no-line/no-white asserted on rendered markup;
+`/stats` prerenders static; header nav Focus↔Stats.
+
 ### Task 21: Trends + time-of-day panels
 **Description:** ▲/▼ deltas vs. preceding equal-length period for each headline metric (muted styling); time-of-day distribution (hour histogram) from `startedAt` + recorded offsets.
 **Acceptance:**
-- [ ] Deltas compare to the immediately preceding period of equal length, incl. partial custom ranges
-- [ ] Time-of-day buckets use each session's recorded offset (no tz guessing)
+- [x] Deltas compare to the immediately preceding period of equal length, incl. partial custom ranges
+- [x] Time-of-day buckets use each session's recorded offset (no tz guessing)
 **Verification:** Unit tests with cross-timezone fixtures (PRD §10.10).
 **Dependencies:** Task 20
 **Files:** components/stats/trends.tsx, components/stats/time-of-day.tsx, lib/aggregations.ts
 **Scope:** S
 
+**Gate (done 2026-10-16):** deltas pinned on the oracle fixture + a mid-day
+custom window; histogram pinned with three offsets converging on one local
+hour; trends view renders one muted tone at every value (asserted).
+
 ### Task 22: Session history list + empty states
 **Description:** Reverse-chronological session table (start, duration, phase, task, project) grouped by day; read-only; calm empty state for new users.
 **Acceptance:**
-- [ ] Grouping respects local day at completion; archived project names still render
-- [ ] No edit/delete affordances (CSV is the repair path per PRD)
+- [x] Grouping respects local day at completion; archived project names still render
+- [x] No edit/delete affordances (CSV is the repair path per PRD)
 **Verification:** Manual with seeded multi-day data.
 **Dependencies:** Task 20, Task 13
 **Files:** components/stats/session-history.tsx, convex/stats.ts
 **Scope:** S
+
+**Gate (done 2026-10-16):** grouping pinned on the oracle (+120 session under
+Jun 10); archived names render muted, deleted tasks keep rows but lose titles;
+markup asserted free of button/a/input; empty state calm and number-free.
 
 **Checkpoint F:** oracle + tz tests green; stats page reviewed against DESIGN.md. Human review.
 
