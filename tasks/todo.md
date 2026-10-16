@@ -459,8 +459,8 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 15: Streak derivation + timezone tests + badge
 **Description:** `lib/streak.ts`: derive current streak from session log using recorded tz offsets — earn day = ≥1 completed focus session; break = missed local calendar day; no grace. Header streak badge (fire icon, design-accurate).
 **Acceptance:**
-- [ ] Fixture tests: 23:59 vs 00:01 edges, two offsets, gap days, no sessions
-- [ ] Streak never stored — recomputed (ADR-003)
+- [x] Fixture tests: 23:59 vs 00:01 edges, two offsets, gap days, no sessions
+- [x] Streak never stored — recomputed (ADR-003)
 **Verification:** `npm test -- streak`.
 **Dependencies:** Task 8, Task 2
 **Files:** lib/streak.ts, tests/streak.test.ts, components/chrome/streak-badge.tsx
@@ -469,8 +469,8 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 16: Settings dialog + wire to timer
 **Description:** shadcn dialog with durations (focus/short/long), session count N, auto-start focus/break toggles, notifications toggle; persisted to `settings`; timer engine reads settings on phase transitions.
 **Acceptance:**
-- [ ] Changes apply to the next phase transition without reload
-- [ ] Defaults match PRD (25/5/15, N=4, break auto-ON, focus auto-OFF)
+- [x] Changes apply to the next phase transition without reload
+- [x] Defaults match PRD (25/5/15, N=4, break auto-ON, focus auto-OFF)
 **Verification:** Unit test settings→engine integration; manual edit-and-run.
 **Dependencies:** Task 5, Task 6, Task 3
 **Files:** components/settings/*.tsx, convex/settings.ts, lib/store/timer.ts
@@ -479,8 +479,8 @@ Four design/PRD divergences were resolved in favour of the PRD's *requirements* 
 ### Task 17: Browser notifications on phase end
 **Description:** Notification permission requested on first Start press (never on load); phase-end notification respecting the settings toggle; respect browser denial gracefully (in-app fallback indicator).
 **Acceptance:**
-- [ ] No permission prompt before first Start; prompt only once
-- [ ] Denied permission = no crash, in-app phase-end signal still visible
+- [x] No permission prompt before first Start; prompt only once
+- [x] Denied permission = no crash, in-app phase-end signal still visible
 **Verification:** Manual across granted/denied paths.
 **Dependencies:** Task 16, Task 8
 **Files:** lib/notify.ts, lib/store/timer.ts
