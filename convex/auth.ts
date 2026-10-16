@@ -1,9 +1,13 @@
 import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { Email } from "@convex-dev/auth/providers/Email";
 import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
-import type { WithoutSystemFields } from "convex/server";
+import type {
+  GenericMutationCtx,
+  WithoutSystemFields,
+} from "convex/server";
+import type { GenericId } from "convex/values";
 
-import type { Doc } from "./_generated/dataModel";
+import type { DataModel, Doc } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 
 /**
@@ -42,6 +46,100 @@ export function anonymousProfile(): WithoutSystemFields<Doc<"users">> & {
   isAnonymous: true;
 } {
   return { isAnonymous: true, createdAt: Date.now() };
+}
+
+/**
+ * The shape `@convex-dev/auth` hands `callbacks.createOrUpdateUser`
+ * (mirrors its `CreateOrUpdateUserArgs`; only the fields used here).
+ */
+export interface CreateOrUpdateUserArgs {
+  /** Non-null when signing back into an existing account. */
+  existingUserId: GenericId<"users"> | null;
+  /** "verification" after a magic-link click; provider id otherwise. */
+  type: "oauth" | "credentials" | "email" | "phone" | "verification";
+  profile: Record<string, unknown> & {
+    email?: string;
+    name?: string;
+    image?: string;
+    isAnonymous?: boolean;
+    createdAt?: number;
+    emailVerified?: boolean;
+    phoneVerified?: boolean;
+  };
+}
+
+/**
+ * User creation with `createdAt` — the magic-link crash fix.
+ *
+ * The library's default writer inserts the verification profile verbatim
+ * (`{ email }`), but PRD §6 requires `users.createdAt`, so every magic-link
+ * verification died with a schema violation. `Anonymous` is unaffected (its
+ * `profile` above already stamps `createdAt`), yet this callback intercepts
+ * ALL providers, so it must preserve the anonymous shape too.
+ *
+ * It mirrors the default's two behaviors and adds the stamp:
+ *   1. `existingUserId` set → patch profile fields (+ backfill `createdAt`
+ *      on pre-fix rows that lack it) and return it.
+ *   2. Otherwise, when `profile.email` is present, link to the existing
+ *      verified-email user if one exists (same as the default's
+ *      should-link-via-email); else insert with `createdAt: Date.now()`.
+ *
+ * `undefined` values are stripped before every write: `patch` deletes a
+ * field given `undefined`, so passing one through would erase data.
+ */
+export async function createOrUpdateUserWithCreatedAt(
+  ctx: GenericMutationCtx<DataModel>,
+  args: CreateOrUpdateUserArgs,
+): Promise<GenericId<"users">> {
+  const { existingUserId, profile } = args;
+  const fields: Record<string, string | number | boolean> = {};
+  if (typeof profile.email === "string") fields.email = profile.email;
+  if (typeof profile.name === "string") fields.name = profile.name;
+  if (typeof profile.image === "string") fields.image = profile.image;
+  if (profile.isAnonymous === true) fields.isAnonymous = true;
+  if (profile.emailVerified === true) {
+    fields.emailVerificationTime = Date.now();
+  }
+  if (profile.phoneVerified === true) {
+    fields.phoneVerificationTime = Date.now();
+  }
+
+  if (existingUserId !== null) {
+    const existing = await ctx.db.get(existingUserId);
+    const patch: Record<string, string | number | boolean> = { ...fields };
+    if (
+      existing !== null &&
+      (existing as Record<string, unknown>).createdAt === undefined
+    ) {
+      patch.createdAt = Date.now();
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(existingUserId, patch);
+    }
+    return existingUserId;
+  }
+
+  if (typeof profile.email === "string") {
+    const linked = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", profile.email as string))
+      .unique();
+    if (
+      linked !== null &&
+      (linked as Record<string, unknown>).emailVerificationTime !== undefined
+    ) {
+      if (Object.keys(fields).length > 0) {
+        await ctx.db.patch(linked._id, fields);
+      }
+      return linked._id;
+    }
+  }
+
+  // The provider's own stamp wins when present (anonymous `profile`
+  // carries one); otherwise the write itself is the creation moment.
+  const createdAt =
+    typeof profile.createdAt === "number" ? profile.createdAt : Date.now();
+  return await ctx.db.insert("users", { ...fields, createdAt });
 }
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
@@ -84,6 +182,11 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       },
     }),
   ],
+  callbacks: {
+    // Every provider (anonymous included) flows through here; the default
+    // writer cannot satisfy the required `createdAt` (see above).
+    createOrUpdateUser: createOrUpdateUserWithCreatedAt,
+  },
 });
 
 /**
