@@ -14,6 +14,7 @@ import type * as lib_order from "../lib/order.js";
 import type * as lib_owner from "../lib/owner.js";
 import type * as projects from "../projects.js";
 import type * as sessions from "../sessions.js";
+import type * as settings from "../settings.js";
 import type * as tasks from "../tasks.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   "lib/owner": typeof lib_owner;
   projects: typeof projects;
   sessions: typeof sessions;
+  settings: typeof settings;
   tasks: typeof tasks;
 }>;
 

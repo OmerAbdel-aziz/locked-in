@@ -5,6 +5,8 @@ import { ConvexReactClient } from "convex/react";
 import { useEffect, type ReactNode } from "react";
 
 import { SessionLogger } from "@/components/session-logger";
+import { PhaseNotice } from "@/components/settings/phase-notice";
+import { SettingsSync } from "@/components/settings/settings-sync";
 
 /**
  * Client-side Convex wiring — Task 4.
@@ -64,6 +66,12 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
           conditions the app starts with, and a completed session must find
           a writer no matter which route was showing. */}
       <SessionLogger />
+      {/* Task 16: server settings flow into the timer store from here, so a
+          change in the dialog reaches the next phase transition on any
+          route without a reload. Task 17's in-app phase-end toast likewise
+          lives at the root so it can surface above any page. */}
+      <SettingsSync />
+      <PhaseNotice />
       {children}
     </ConvexAuthProvider>
   );

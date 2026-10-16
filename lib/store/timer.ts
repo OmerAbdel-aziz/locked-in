@@ -26,6 +26,7 @@ import {
   type TimerSettings,
   type TimerState,
 } from "@/lib/pomodoro";
+import { ensurePermissionOnFirstStart, notifyPhaseEnd } from "@/lib/notify";
 
 /**
  * The timer store — Task 6.
@@ -89,9 +90,38 @@ export interface CompletedPhase {
  */
 export type SessionLogger = (entry: CompletedPhase) => void;
 
+/**
+ * The in-app phase-end signal — Task 17.
+ *
+ * Set on *every* completion, whether or not a browser notification was
+ * shown: when permission is denied (or the API is missing) this is the
+ * signal the user still sees, and when a notification did fire it is the
+ * same fact in a second place. `at` is the completion instant, data rather
+ * than a clock read, so rendering it never consults `Date.now()`.
+ */
+export interface PhaseNotice {
+  phase: Phase;
+  at: number;
+}
+
 export interface TimerStore {
   state: TimerState;
   settings: TimerSettings;
+
+  /**
+   * The notifications toggle from `settings` (Task 16). Kept beside — not
+   * inside — `TimerSettings` because the engine never reads it: it is not
+   * a duration or a transition policy, and `completePhase` must stay a pure
+   * function of phase + settings + now for the equivalence test to mean
+   * anything. The sync component (`components/settings/settings-sync.tsx`)
+   * keeps this level with the server row.
+   */
+  notificationsEnabled: boolean;
+  setNotificationsEnabled: (enabled: boolean) => void;
+
+  /** The latest phase-end signal; cleared by `start`, dismissed by the UI. */
+  phaseNotice: PhaseNotice | null;
+  dismissNotice: () => void;
 
   /**
    * The selection — which task the *next* phase to begin will bind to
@@ -209,6 +239,10 @@ export const useTimerStore = create<TimerStore>((set, get) => {
   return {
     state: initialTimerState(),
     settings: DEFAULT_SETTINGS,
+    notificationsEnabled: true,
+
+    phaseNotice: null,
+    dismissNotice: () => set({ phaseNotice: null }),
 
     activeTask: null,
     boundTask: null,
@@ -221,7 +255,21 @@ export const useTimerStore = create<TimerStore>((set, get) => {
     sessionLogger: null,
     setSessionLogger: (sessionLogger) => set({ sessionLogger }),
 
-    start: () => transition(startPhase(get().state, get().settings, Date.now())),
+    setNotificationsEnabled: (notificationsEnabled) =>
+      set({ notificationsEnabled }),
+
+    start: () => {
+      // Task 17: the one and only permission prompt. It runs from the Start
+      // handler — never on load, never during render — and `notify.ts`
+      // guarantees it can only ever prompt once per page lifetime. The
+      // timer itself never waits on it: fire-and-forget by construction.
+      void ensurePermissionOnFirstStart(get().notificationsEnabled).catch(
+        () => {},
+      );
+      transition(startPhase(get().state, get().settings, Date.now()), {
+        phaseNotice: null,
+      });
+    },
 
     pause: () => transition(pauseTimer(get().state, Date.now())),
 
@@ -243,6 +291,14 @@ export const useTimerStore = create<TimerStore>((set, get) => {
       // must not be able to leave the face frozen at 00:00 — the cycle moves
       // whether or not the row gets away.
       transition(completePhase(state, settings, now));
+
+      // Task 17: the phase-end signal. The browser notification is attempted
+      // — silently skipped when off, unsupported, or not permitted — and the
+      // in-app notice is recorded either way, so a denied permission still
+      // leaves something visible. Neither can throw into the transition
+      // above: it already happened.
+      notifyPhaseEnd(state.phase, get().notificationsEnabled);
+      set({ phaseNotice: { phase: state.phase, at: now } });
 
       // A phase that never began has no span to record. `startedAt` is null
       // exactly while idle, so calling `complete()` on a waiting phase moves

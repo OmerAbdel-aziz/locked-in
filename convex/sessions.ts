@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 
+import { currentStreak } from "../lib/streak";
 import { requireOwnedProject, resolveOwner, taskIfYours } from "./lib/owner";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 /**
  * Session log writes — Task 8.
@@ -147,3 +148,48 @@ export const logCompleted = mutation({
     });
   },
 });
+
+/**
+ * The longest run of consecutive earned days ending today (or yesterday,
+ * when today has nothing yet) — Task 15, PRD §4.1's "Streak: 5".
+ *
+ * Derived on every read from the log (ADR-003): nothing is stored, so a
+ * merge or a CSV import recomputes honestly the next time this runs. The
+ * per-session day math lives in `lib/streak.ts`, shared with the unit
+ * fixtures — this query only bounds the read.
+ *
+ * Bounded by recency, not by day window: the 1,000 most recent rows are
+ * more than enough to find the first gap (a streak breaks at the first
+ * unearned day, and 1,000 sessions span years for a personal log). A log
+ * longer than that still answers correctly unless its *unbroken* streak
+ * alone exceeds 1,000 sessions without a gap — at which point the number
+ * is a lower bound, and the app has a nicer problem than this cap.
+ */
+export const streak = query({
+  args: {
+    /**
+     * The device's UTC offset in minutes, as `-new Date().getTimezoneOffset()`
+     * reports it. Only "today" is derived from it — every historical day
+     * comes from its own session's recorded offset (PRD §6).
+     */
+    tzOffsetMinutes: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+
+    const recent = await ctx.db
+      .query("sessions")
+      .withIndex("by_owner_completed", (q) => q.eq("ownerId", ownerId))
+      .order("desc")
+      .take(STREAK_SCAN_LIMIT);
+
+    // `Date.now()` in a query is normally suspect (determinism across
+    // subscribers), but "today" is inherently about now, and `todaySummary`
+    // in `convex/tasks.ts` already reads the clock the same way for the
+    // same reason.
+    return currentStreak(recent, Date.now(), args.tzOffsetMinutes);
+  },
+});
+
+/** Enough history to find the first gap; see `streak` above. */
+const STREAK_SCAN_LIMIT = 1000;
