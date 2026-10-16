@@ -180,6 +180,41 @@ export const update = mutation({
 });
 
 /**
+ * Deletes one owned task.
+ *
+ * Added in the Phase 9 polish (human-directed): PRD §4.2 listed
+ * create/complete/reorder only, but a list with no way back from a typo is
+ * a trap — the add pill takes a title in one field with no undo.
+ *
+ * What survives the delete, and why that is safe:
+ *   - **Sessions keep their rows.** `sessions` is append-only (ADR-003) and
+ *     `logCompleted`'s `taskIfYours` already tolerates a task deleted
+ *     mid-flight (Task 11 deviation 3): the row is written *unbound* rather
+ *     than refused, and history renders it without a title. Deleting a task
+ *     therefore never destroys focus history — only its label.
+ *   - **The selection pointer is repaired here, not lazily.** `activeTask`
+ *     tolerates a dangling pointer, but a rail that vanished while the
+ *     timer keeps crediting a ghost is worse than one that clears: the same
+ *     patch `selectTask` writes for an explicit clear.
+ */
+export const remove = mutation({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+    const task = await requireOwnedTask(ctx, ownerId, args.taskId);
+
+    await ctx.db.delete(task._id);
+
+    const owner = await ctx.db.get(ownerId);
+    if (owner?.activeTaskId === task._id) {
+      // `undefined` deletes the field — the clear `selectTask` performs.
+      await ctx.db.patch(ownerId, { activeTaskId: undefined });
+    }
+    return task._id;
+  },
+});
+
+/**
  * Marks a task done: flips the fast-path flag and stamps `completedAt` so the
  * two never disagree.
  *

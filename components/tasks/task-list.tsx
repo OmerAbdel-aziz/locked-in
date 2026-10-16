@@ -25,7 +25,7 @@ import { useState, type DragEvent } from "react";
 import { dropNeighbours, type DropPosition } from "@/lib/task-order";
 
 import { TaskInput } from "./task-input";
-import { TaskItem, type TaskRow } from "./task-item";
+import { TaskItem, type TaskPatch, type TaskRow } from "./task-item";
 import type { PickerProject } from "@/components/projects/picker";
 
 // Re-exported because `tasks` is half of `TaskListProps`: a consumer
@@ -54,6 +54,15 @@ interface TaskListProps<Id extends string> {
    * server's answer.
    */
   onSelect: (id: Id) => void;
+  /**
+   * Saves a row edit (Phase 9): title, leaves, project in one patch — the
+   * exact fields `tasks.update` accepts. Stringly-typed project id for the
+   * same reason `onCreate`'s is: this is a *project* id in a component
+   * generic over *task* ids.
+   */
+  onUpdate: (id: Id, patch: TaskPatch) => void;
+  /** Deletes one row (Phase 9). Session history survives the delete. */
+  onRemove: (id: Id) => void;
   /**
    * False while the anonymous identity is still being established.
    *
@@ -87,6 +96,8 @@ export function TaskList<Id extends string>({
   onReorder,
   onClearCompleted,
   onSelect,
+  onUpdate,
+  onRemove,
   ready = true,
   projects,
   pickerProjectId = null,
@@ -178,6 +189,9 @@ export function TaskList<Id extends string>({
             dragging={draggedId !== null && row.id === draggedId}
             onToggle={onToggle}
             onSelect={onSelect}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+            projects={projects}
             onDragStart={(id) => setDraggedId(id)}
             onDragOver={hover}
             onDragEnd={() => {

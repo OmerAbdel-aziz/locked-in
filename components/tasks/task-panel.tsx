@@ -166,6 +166,8 @@ export function TaskPanel() {
   const reorder = useMutation(api.tasks.reorder);
   const clearCompleted = useMutation(api.tasks.clearCompleted);
   const selectTask = useMutation(api.tasks.selectTask);
+  const update = useMutation(api.tasks.update);
+  const remove = useMutation(api.tasks.remove);
 
   // The timer cannot come and ask: it is a plain module with no client and
   // no env var (Task 6's seam), so the selection is pushed into it from here
@@ -328,6 +330,23 @@ export function TaskPanel() {
           const next = id === activeTaskId ? null : id;
           void selectTask({ taskId: next }).catch((error) =>
             failed("change the active task", error),
+          );
+        }}
+        onUpdate={(id, patch) => {
+          // The row hands over a plain string project id (or null to
+          // unbind); the mutation wants the branded id and re-proves
+          // ownership before writing it, so the cast is the same one the
+          // create path makes above.
+          void update({
+            taskId: id,
+            title: patch.title,
+            estimate: patch.estimate,
+            projectId: patch.projectId as Id<"projects"> | null,
+          }).catch((error) => failed("edit the task", error));
+        }}
+        onRemove={(id) => {
+          void remove({ taskId: id }).catch((error) =>
+            failed("delete the task", error),
           );
         }}
       />

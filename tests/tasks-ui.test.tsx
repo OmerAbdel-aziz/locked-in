@@ -71,6 +71,8 @@ function renderList(tasks: TaskRow<string>[]) {
   const onReorder = vi.fn();
   const onClearCompleted = vi.fn();
   const onSelect = vi.fn();
+  const onUpdate = vi.fn();
+  const onRemove = vi.fn();
 
   const view = render(
     <TaskList
@@ -80,10 +82,21 @@ function renderList(tasks: TaskRow<string>[]) {
       onReorder={onReorder}
       onClearCompleted={onClearCompleted}
       onSelect={onSelect}
+      onUpdate={onUpdate}
+      onRemove={onRemove}
     />,
   );
 
-  return { ...view, onCreate, onToggle, onReorder, onClearCompleted, onSelect };
+  return {
+    ...view,
+    onCreate,
+    onToggle,
+    onReorder,
+    onClearCompleted,
+    onSelect,
+    onUpdate,
+    onRemove,
+  };
 }
 
 /**
@@ -305,6 +318,8 @@ describe("adding a task", () => {
         onReorder={vi.fn()}
         onClearCompleted={vi.fn()}
         onSelect={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
         ready={false}
       />,
     );
@@ -520,6 +535,134 @@ describe("clear completed", () => {
 
     fireEvent.click(button);
     expect(onClearCompleted).not.toHaveBeenCalled();
+  });
+});
+
+describe("editing and deleting a row (Phase 9)", () => {
+  it("opens the edit form seeded with the row's own fields", () => {
+    const { onUpdate } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+
+    const title = screen.getByLabelText("Edit title of Draft the outline");
+    expect((title as HTMLInputElement).value).toBe("Draft the outline");
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("saves a trimmed title through onUpdate", () => {
+    const { onUpdate } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+    fireEvent.change(screen.getByLabelText("Edit title of Draft the outline"), {
+      target: { value: "  Rewritten  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [id, patch] = (onUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(id).toBe("a");
+    expect(patch.title).toBe("Rewritten");
+    // Untouched fields travel as the row's own values, not as omissions —
+    // the mutation treats "leave alone" and "set to the same" identically,
+    // but a form that dropped them would silently unbind the project.
+    expect(patch.estimate).toBe(4);
+    expect(patch.projectId).toBeNull();
+    // The row returns to display mode.
+    expect(screen.queryByLabelText("Edit title of Draft the outline")).toBeNull();
+  });
+
+  it("saves on Enter and cancels on Escape", () => {
+    const { onUpdate } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Review pull requests" }));
+    const input = screen.getByLabelText("Edit title of Review pull requests");
+    fireEvent.change(input, { target: { value: "Enter saves" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Weekly 1:1 notes" }));
+    fireEvent.keyDown(screen.getByLabelText("Edit title of Weekly 1:1 notes"), {
+      key: "Escape",
+    });
+    // Cancelled: nothing reached the mutation and the row shows its old title.
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Weekly 1:1 notes")).toBeTruthy();
+  });
+
+  it("treats an empty title as a cancelled edit, not a blank task", () => {
+    const { onUpdate } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+    fireEvent.change(screen.getByLabelText("Edit title of Draft the outline"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText("Draft the outline")).toBeTruthy();
+  });
+
+  it("changes the estimate through the edit form's leaf select", () => {
+    const { onUpdate } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+    // The trigger's accessible name is the composed [value, label] — the
+    // row's estimate (4) followed by "Leaves"; the add pill reads
+    // "2 Leaves" (its default), so the value disambiguates the two.
+    fireEvent.click(screen.getByRole("button", { name: "4 Leaves" }));
+    fireEvent.click(screen.getByRole("option", { name: "8" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const [, patch] = (onUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(patch.estimate).toBe(8);
+    expect(patch.title).toBe("Draft the outline");
+  });
+
+  it("deletes the row through onRemove", () => {
+    const { onRemove } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Review pull requests" }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect((onRemove as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("b");
+  });
+
+  it("keeps edit and delete from selecting the row", () => {
+    // They are row maintenance, not a claim about where the next session
+    // should land — the same reason the checkbox stops propagation.
+    const { onSelect } = renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Morning inbox zero" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("freezes the row while editing: no drag, no keyboard select", () => {
+    renderList(TASKS);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Draft the outline" }));
+    const row = rowFor("a");
+
+    expect(row.getAttribute("data-editing")).toBe("true");
+    expect(row.getAttribute("draggable")).not.toBe("true");
+
+    fireEvent.keyDown(row, { key: "Enter" });
+    // The guard is the edit flag: Enter on the row itself must not select
+    // while a half-typed form owns it.
+    expect(screen.queryByLabelText("Edit title of Draft the outline")).toBeTruthy();
+  });
+
+  it("offers edit and delete on finished rows too", () => {
+    // Completed tasks can carry a typo just as open ones can, and
+    // "Clear completed" is the bulk path, not the only one.
+    renderList(TASKS);
+
+    expect(
+      screen.getByRole("button", { name: "Edit Morning inbox zero" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Delete Morning inbox zero" }),
+    ).toBeTruthy();
   });
 });
 

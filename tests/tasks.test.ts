@@ -316,6 +316,113 @@ describe("update", () => {
   });
 });
 
+describe("remove", () => {
+  it("deletes the row and leaves its neighbours in place", async () => {
+    const { base, t } = await world();
+    const first = await make(t, "keep me", 2);
+    const doomed = await make(t, "delete me", 4);
+    const last = await make(t, "also keep", 1);
+
+    await t.mutation(api.tasks.remove, { taskId: doomed });
+
+    const { active } = await t.query(api.tasks.list, {});
+    expect(active.map((task) => task._id)).toEqual([first, last]);
+    // The survivor's fractional key is untouched — deleting renumbers
+    // nothing (the same O(1) property `reorder` holds).
+    expect(active[0].order).toBeLessThan(active[1].order);
+    expect(await base.run((ctx) => ctx.db.get(doomed))).toBeNull();
+  });
+
+  it("clears the selection when the deleted task was the active one", async () => {
+    const { base, ownerId, t } = await world();
+    const id = await make(t, "selected", 2);
+    await t.mutation(api.tasks.selectTask, { taskId: id });
+
+    await t.mutation(api.tasks.remove, { taskId: id });
+
+    // The pointer is repaired here, not left to dangle until the next
+    // session write notices: a rail that vanished while the timer keeps
+    // crediting a ghost is worse than one that clears.
+    const owner = await base.run((ctx) => ctx.db.get(ownerId));
+    expect(owner?.activeTaskId).toBeUndefined();
+  });
+
+  it("leaves the selection alone when the deleted task was not active", async () => {
+    const { base, ownerId, t } = await world();
+    const selected = await make(t, "selected", 2);
+    const other = await make(t, "other", 1);
+    await t.mutation(api.tasks.selectTask, { taskId: selected });
+
+    await t.mutation(api.tasks.remove, { taskId: other });
+
+    const owner = await base.run((ctx) => ctx.db.get(ownerId));
+    expect(owner?.activeTaskId).toBe(selected);
+  });
+
+  it("keeps the session history the deleted task accrued", async () => {
+    const { base, t, ownerId } = await world();
+    const id = await make(t, "doomed but remembered", 2);
+    // One focus session bound to the task, through the real writer.
+    // Timestamps must postdate 2020 (the mutation's plausibility floor).
+    const start = Date.UTC(2026, 4, 1, 9);
+    await t.mutation(api.sessions.logCompleted, {
+      startedAt: start,
+      completedAt: start + 25 * 60_000,
+      phase: "focus",
+      tzOffsetAtCompletion: 0,
+      taskId: id,
+    });
+
+    await t.mutation(api.tasks.remove, { taskId: id });
+
+    // ADR-003: the log is append-only, and CSV import is its only repair
+    // path. Deleting the task removes the *label*, never the hours.
+    const sessions = await base.run((ctx) =>
+      ctx.db
+        .query("sessions")
+        .withIndex("by_owner_completed", (q) => q.eq("ownerId", ownerId))
+        .collect(),
+    );
+    expect(sessions).toHaveLength(1);
+    // The row keeps the id it was bound to (the snapshot, D8) — history
+    // renders it unbound-by-deletion rather than rewriting the past.
+    expect(sessions[0].taskId).toBe(id);
+  });
+
+  it("will not delete a task owned by somebody else", async () => {
+    const { stranger, t } = await world();
+    const theirs = await make(stranger, "theirs", 2);
+
+    // "not found", never "forbidden" — the same stance every other
+    // cross-tenant path takes (see `update` above).
+    await expect(
+      t.mutation(api.tasks.remove, { taskId: theirs }),
+    ).rejects.toThrow(/task not found/);
+    expect((await stranger.query(api.tasks.list, {})).active).toHaveLength(1);
+  });
+
+  it("refuses an unauthenticated caller", async () => {
+    const { base } = await world();
+    const id = await base.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", {
+        createdAt: 1,
+        isAnonymous: true,
+      });
+      return await ctx.db.insert("tasks", {
+        ownerId,
+        title: "task",
+        estimate: 2,
+        order: 1,
+        activeFlag: true,
+      });
+    });
+
+    await expect(
+      base.mutation(api.tasks.remove, { taskId: id }),
+    ).rejects.toThrow(/unauthenticated/);
+  });
+});
+
 describe("complete and uncomplete", () => {
   it("stamps completedAt and keeps the row", async () => {
     const { base, t } = await world();

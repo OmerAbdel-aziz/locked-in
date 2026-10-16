@@ -227,6 +227,8 @@ describe("the add pill with a picker", () => {
         onReorder={vi.fn()}
         onClearCompleted={vi.fn()}
         onSelect={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
         projects={options?.projects}
         pickerProjectId={null}
         onPickerProjectChange={
@@ -254,6 +256,8 @@ describe("the add pill with a picker", () => {
         onReorder={vi.fn()}
         onClearCompleted={vi.fn()}
         onSelect={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
         projects={[{ id: "p1", name: "Ship Q2" }]}
         pickerProjectId="p1"
         onPickerProjectChange={vi.fn()}
@@ -289,6 +293,8 @@ describe("the add pill with a picker", () => {
         projects={[{ id: "p1", name: "Ship Q2" }]}
         pickerProjectId={null}
         onPickerProjectChange={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
@@ -380,6 +386,8 @@ describe("toTaskRows joins projects", () => {
         onReorder={vi.fn()}
         onClearCompleted={vi.fn()}
         onSelect={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
