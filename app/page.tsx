@@ -8,8 +8,7 @@
  * `docs/design/code.html` — a 12-column grid split 7/5 (ADR-004) — so column
  * placement matches `screen.png`.
  *
- * Still scaffolding, replaced by their own tasks:
- *   - the streak pill (Task 15, which derives it from the session log)
+ * Still scaffolding, replaced by its own task:
  *   - the footer chrome (Task 26)
  *
  * The Task 2 token-probe strip has been removed, as it was always meant to
@@ -19,6 +18,8 @@
 
 import { ModeTabs } from "@/components/timer/mode-tabs";
 import { TimerEngine } from "@/components/timer/timer-engine";
+import { StreakBadge } from "@/components/chrome/streak-badge";
+import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { ProgressCard } from "@/components/tasks/progress-card";
 import { SummaryBento } from "@/components/tasks/summary-bento";
 import { TaskPanel } from "@/components/tasks/task-panel";
@@ -34,9 +35,11 @@ export default function Page() {
 
         <ModeTabs />
 
-        {/* Placeholder — Task 15 derives the real streak from the log. */}
-        <div className="flex items-center gap-3 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-          Streak: 5
+        {/* Task 15: derived from the session log, never stored (ADR-003).
+            Task 16's dialog sits beside it — both are header chrome. */}
+        <div className="flex items-center gap-2">
+          <StreakBadge />
+          <SettingsDialog />
         </div>
       </header>
 
