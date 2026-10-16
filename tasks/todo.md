@@ -573,32 +573,54 @@ markup asserted free of button/a/input; empty state calm and number-free.
 ### Task 23: Magic-link sign-in
 **Description:** Convex Auth email magic link; `/login` route + header entry ("Sync your data"); on success, link the current anonymous identity to the user (no data moves yet).
 **Acceptance:**
-- [ ] Anonymous identity links to user without losing existing data
-- [ ] Anonymous-only users never see sign-in prompts during core flows (PRD §10.1)
+- [x] Anonymous identity links to user without losing existing data
+- [x] Anonymous-only users never see sign-in prompts during core flows (PRD §10.1)
 **Verification:** Integration test for link; manual magic-link flow.
 **Dependencies:** Task 4
-**Files:** convex/auth.ts, app/login/page.tsx, components/chrome/account-button.tsx
+**Files:** convex/auth.ts, app/login/page.tsx, components/auth/account-button.tsx
 **Scope:** M
+
+**Gate (done 2026-10-16):** `viewer` query distinguishes anonymous/account;
+`/login` sends Resend magic link, header shows "Sync your data" for anonymous
+only (regression-safe: top-level hooks limited to the two the page tests stub);
+link verified by `needsMerge`/`execute` integration tests + manual flow.
+Follow-up fix shipped same day: library's default user writer dropped the
+required `createdAt` on email verification — `createOrUpdateUser` callback now
+stamps it (gated by `tests/auth-callback.test.ts`, 5 tests).
 
 ### Task 24: Merge-on-sign-in prompt + merge logic
 **Description:** If anonymous data exists when linking, show the prompt ("We found data on this device…", default action = merge). `lib/merge.ts`: tasks union (dedupe title+createdAt), projects union (case-insensitive name, remap task `projectId`), sessions union, streak/aggregates recompute from union.
 **Acceptance:**
-- [ ] Golden fixtures (anonymous-only, account-only, both-diverged) merge to expected states — sessions never lost or duplicated
-- [ ] "Use account instead" discards device data explicitly (destructive path confirmed)
+- [x] Golden fixtures (anonymous-only, account-only, both-diverged) merge to expected states — sessions never lost or duplicated
+- [x] "Use account instead" discards device data explicitly (destructive path confirmed)
 **Verification:** Golden-fixture integration tests (PRD §10.4).
 **Dependencies:** Task 23, Task 13
 **Files:** lib/merge.ts, components/auth/merge-prompt.tsx, convex/merge.ts, tests/merge.test.ts
 **Scope:** M–L — build `lib/merge.ts` + golden fixtures first (its own sitting); prompt UI + mutation wiring second. Flag for split if either half exceeds ~5 files.
 
+**Gate (done 2026-10-16):** `tests/merge.test.ts` (18 tests): Q1–Q6 locked
+rulings (task key = trimmed+folded title + UTC day; account wins; full-row
+session dedupe; earliest project spelling, archived-only-if-both; sessions
+remap; order-append/activeTask/settings rules) + `convex-test` integration for
+`merge.execute` (union + remap + identities link), exact-dupe drop,
+`discardDeviceData` hard-delete (Q10), and `importRows` unknown-reject/valid/
+duplicate. Ask-first prompt renders only post-sign-in with device data.
+
 ### Task 25: CSV export + import
 **Description:** Export sessions as `startedAt,completedAt,phase,task,project`; import parses/validates same schema through the same mutation path as completions (dedupe on identical rows); entry points in Settings/Stats; import feeds the merge semantics from Task 24.
 **Acceptance:**
-- [ ] Export → import round-trip is lossless (PRD §10.5)
-- [ ] Malformed rows rejected with row-level errors, valid rows still importable
+- [x] Export → import round-trip is lossless (PRD §10.5)
+- [x] Malformed rows rejected with row-level errors, valid rows still importable
 **Verification:** Round-trip unit test + manual import of a foreign-tool CSV.
 **Dependencies:** Task 24
 **Files:** lib/csv.ts, components/settings/data-io.tsx, convex/sessions.ts, tests/csv.test.ts
 **Scope:** M
+
+**Gate (done 2026-10-16):** `tests/csv.test.ts` (6 tests): 6-col format with
+`tzOffsetAtCompletion` (Q7b), lossless export→import round-trip incl. quoted
+commas, epoch-ms foreign timestamps, row-numbered errors, bad-header fast
+fail. `DataIo` component hosts export download + import with per-row report;
+unknown task/project names reject at `importRows` (Q8b, no auto-create).
 
 **Checkpoint G:** merge + CSV fixtures green. Review with human.
 
