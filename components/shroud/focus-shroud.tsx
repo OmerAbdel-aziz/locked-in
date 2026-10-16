@@ -113,7 +113,7 @@ export function ShroudToggle() {
 }
 
 /**
- * The left-column wrapper — Task 18 fix (2026-10-16).
+ * The left-column wrapper — Task 18 fix (2026-10-16), Phase 9 polish.
  *
  * The veil sits at root-level `z-40`, but the column carries the `.enter`
  * entrance animation whose `both` fill mode retains `translateY(0)` forever —
@@ -123,8 +123,17 @@ export function ShroudToggle() {
  * therefore belongs here, on the column itself: `main` and the page root are
  * unpositioned and create no stacking contexts, so this one positioned
  * ancestor compares against the veil at the root level and wins. The column
- * holds exactly the stay-visible surfaces (engine, active-task card, toggle);
- * header nav, task column, bento and footer keep their natural level and dim.
+ * holds exactly the stay-visible surfaces (mode tabs, engine, active-task
+ * card, toggle); header nav, task column, bento and footer keep their natural
+ * level and dim.
+ *
+ * Phase 9: while the shroud is up the column also takes the full grid width,
+ * so the timer sits centered on the screen instead of parked in its
+ * dashboard lane — same `shroudActive` flag as the elevation, so toggling
+ * the shroud off mid-run snaps back to the 7/5 composition with no new
+ * state. The structural classes live here (not in the page's `className`,
+ * which carries only extras like `enter`) so the two spans can never be
+ * passed together and fight over the cascade.
  */
 export function ShroudColumn({
   className,
@@ -138,9 +147,28 @@ export function ShroudColumn({
     <div
       data-testid="shroud-column"
       data-shroud-elevated={active ? "true" : "false"}
-      className={`${className} ${active ? "relative z-50" : ""}`}
+      className={`col-span-12 flex min-w-0 flex-col items-center justify-center ${
+        active ? "relative z-50 lg:col-span-12" : "lg:col-span-7"
+      } ${className}`}
     >
       {children}
     </div>
   );
+}
+
+/**
+ * The task column's shroud counterpart — Phase 9 polish.
+ *
+ * Grill ruling: under the shroud the right column unmounts rather than
+ * merely dimming. The veil is `pointer-events-none`, so dimmed controls
+ * would stay clickable beneath it — a ghost dashboard catching stray
+ * clicks — and an empty dimmed lane next to a centered timer is dead
+ * space. Unmounting also drops its Convex subscriptions for the run;
+ * they resubscribe when the phase ends. Header and footer stay mounted
+ * and dimmed (Escape and the toggle's keyboard path live outside this).
+ */
+export function ShroudHidden({ children }: { children: React.ReactNode }) {
+  const active = useShroudActive();
+  if (active) return null;
+  return <>{children}</>;
 }

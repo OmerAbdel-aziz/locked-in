@@ -796,6 +796,8 @@ describe("the stats views render fixture data correctly", () => {
     { dayKey: "2024-06-03", focusMs: 0, sessions: 0 },
   ];
 
+  const ONE_DAY = [{ dayKey: "2024-06-01", focusMs: 50 * MIN, sessions: 2 }];
+
   function barHeights(html: string): number[] {
     return [...html.matchAll(/data-bar-height="([\d.]+)"/g)].map((m) =>
       Number(m[1]),
@@ -826,6 +828,35 @@ describe("the stats views render fixture data correctly", () => {
     const html = renderToStaticMarkup(h(SessionsChartView, { days: THREE_DAYS }));
     expect(barHeights(html)).toEqual([96, 48, 0]);
     expectDesignRules(html);
+  });
+
+  it("keeps both chart viewBoxes landscape at every range length (Phase 9)", () => {
+    // The SVGs size from `w-full` + viewBox aspect, so a portrait viewBox
+    // scales to full-screen height: the 7-day range (98×138) rendered ~850px
+    // tall at a 600px column, a 1-day custom range ~5000px. The viewBox
+    // width now has a 3× height floor with bars centered, so every range
+    // renders as a bounded card.
+    for (const View of [FocusChartView, SessionsChartView]) {
+      for (const days of [ONE_DAY, THREE_DAYS]) {
+        const html = renderToStaticMarkup(h(View, { days }));
+        const match = /viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/.exec(html);
+        expect(match).not.toBeNull();
+        const ratio = Number(match![1]) / Number(match![2]);
+        expect(ratio).toBeGreaterThanOrEqual(3);
+      }
+      // Empty state: no NaN in the viewBox.
+      const empty = renderToStaticMarkup(h(View, { days: [] }));
+      expect(empty).not.toContain("NaN");
+    }
+  });
+
+  it("centers the bars inside the padded viewBox", () => {
+    // A short range pads the viewBox with empty space; the bars must sit in
+    // the middle, not hug one edge.
+    const html = renderToStaticMarkup(h(FocusChartView, { days: ONE_DAY }));
+    const viewWidth = Number(/viewBox="0 0 (\d+)/.exec(html)![1]);
+    const x = Number(/<rect[^>]*\sx="([\d.]+)"/.exec(html)![1]);
+    expect(x + 5).toBeCloseTo(viewWidth / 2, 0); // bar is 10 units wide
   });
 
   it("renders deltas muted — direction without judgement", () => {

@@ -14,6 +14,11 @@
  * glass panel, sanctuary easing, ghost controls — with the dialog semantics
  * a library would supply: `role="dialog"` + `aria-modal`, Escape and
  * overlay-click to close, and focus moved into the panel on open.
+ *
+ * Two triggers (Phase 9): the default gear button for standalone use, and
+ * `variant="tab"` — a text item that reads as a third tab inside `NavPill`.
+ * The tab never shows a selected state: it opens this dialog, and a dialog
+ * cannot hold a route's state.
  */
 
 import { useConvexAuth } from "@convex-dev/auth/react";
@@ -21,6 +26,13 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/convex/_generated/api";
+import {
+  MODE_LABEL,
+  PALETTE_LABEL,
+  THEME_MODES,
+  THEME_PALETTES,
+  useTheme,
+} from "@/lib/theme";
 
 /** Draft of the numeric fields while the dialog is open. */
 interface SettingsDraft {
@@ -176,6 +188,73 @@ interface ServerSettings {
   autoStartBreak: boolean;
   autoStartFocus: boolean;
   notificationsEnabled: boolean;
+}
+
+/**
+ * Appearance — Phase 9 polish (grill rulings).
+ *
+ * Palette (Mint / Airbnb / Rabbit) plus light/dark mode as two segmented
+ * rows: the six themes are two independent axes, not six peers. Applies
+ * instantly through `useTheme` — theme is device-local, so there is nothing
+ * for Save to save. Segmented styling mirrors the nav pill; selected state
+ * is tonal fill, never a 1px border (DESIGN.md no-line rule).
+ */
+function AppearanceSection() {
+  const { palette, mode, setPalette, setMode } = useTheme();
+
+  const option = (selected: boolean) =>
+    `flex-1 rounded-full px-3 py-1 text-xs font-bold transition-colors duration-150 ease-sanctuary ${
+      selected
+        ? "bg-surface-container-highest text-on-surface"
+        : "text-on-surface-variant hover:text-on-surface"
+    }`;
+
+  return (
+    <div className="rounded-xl bg-surface-container-low px-4 py-3">
+      <span className="block text-sm font-bold text-on-surface">
+        Appearance
+      </span>
+      <span className="mt-0.5 block text-xs text-on-surface-variant">
+        Applies instantly, stays on this device.
+      </span>
+      <div
+        role="radiogroup"
+        aria-label="Color theme"
+        className="mt-3 flex items-center gap-1 rounded-full bg-surface-container p-1"
+      >
+        {THEME_PALETTES.map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            role="radio"
+            aria-checked={palette === candidate}
+            onClick={() => setPalette(candidate)}
+            className={option(palette === candidate)}
+          >
+            {PALETTE_LABEL[candidate]}
+          </button>
+        ))}
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Light or dark"
+        className="mt-2 flex items-center gap-1 rounded-full bg-surface-container p-1"
+      >
+        {THEME_MODES.map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            role="radio"
+            aria-checked={mode === candidate}
+            onClick={() => setMode(candidate)}
+            className={option(mode === candidate)}
+          >
+            {MODE_LABEL[candidate]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function SettingsForm({ onClose }: { onClose: () => void }) {
@@ -364,6 +443,7 @@ function SettingsFields({
             );
           }}
         />
+        <AppearanceSection />
       </div>
 
       {error !== null && (
@@ -386,29 +466,45 @@ function SettingsFields({
   );
 }
 
-export function SettingsDialog() {
+export function SettingsDialog({ variant }: { variant?: "header" | "tab" }) {
   const { isAuthenticated } = useConvexAuth();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open settings"
-        className="flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1 font-mono text-xs font-bold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-highest hover:text-on-surface"
-      >
-        <GearIcon />
-        Settings
-      </button>
+      {variant === "tab" ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open settings"
+          className="rounded-full px-3 py-1 text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:text-on-surface"
+        >
+          Settings
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open settings"
+          className="flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1 font-mono text-xs font-bold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-highest hover:text-on-surface"
+        >
+          <GearIcon />
+          Settings
+        </button>
+      )}
 
       {open && (
+        // Scrollable overlay (Phase 9): with the Appearance section the
+        // form outgrows short viewports, and a centered flex child that
+        // overflows its container clips the TOP — unreachable. `items-start`
+        // + child `my-auto` centers when the panel fits and starts at the
+        // top (scrollable) when it doesn't.
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         >
           <div
-            className="flex w-full max-w-md justify-center"
+            className="my-auto flex w-full max-w-md justify-center"
             onClick={(event) => event.stopPropagation()}
           >
             {isAuthenticated ? (

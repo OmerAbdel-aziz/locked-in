@@ -15,15 +15,16 @@
  * projects to pick until Task 13, and a control that can only ever offer
  * nothing is worse than one that arrives complete.
  *
- * HeroUI mapping (PRD D6a): the text field is TextField + Input. The leaf
- * 0–8 selector stays a native `<select>` — HeroUI ships no compact
- * number-picker, and a full Select dropdown for nine single digits would be
- * chrome the design never asked for. The `<form>` wrapper stays: it owns the
- * submit (Enter key) contract the list relies on.
+ * HeroUI mapping (PRD D6a): the text field is TextField + Input; the leaf
+ * 0–8 selector is Select + ListBox (Phase 9 — it was a native `<select>`
+ * until the human instruction to move every dropdown onto HeroUI). The
+ * `<form>` wrapper stays: it owns the submit (Enter key) contract the list
+ * relies on, and both dropdown triggers carry `type="button"` so opening
+ * one can never submit it.
  */
 
 import { useState, type FormEvent } from "react";
-import { Input, TextField } from "@heroui/react";
+import { Input, Label, ListBox, Select, TextField } from "@heroui/react";
 
 import {
   ProjectPicker,
@@ -121,39 +122,38 @@ export function TaskInput({
           />
         </TextField>
 
-        <label className="flex shrink-0 items-center gap-2 pr-3">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-on-surface-variant/70">
+        <Select
+          selectedKey={String(estimate)}
+          onSelectionChange={(key) => setEstimate(Number(key))}
+          isDisabled={!ready}
+          className="flex shrink-0 items-center gap-2 pr-3"
+        >
+          {/* Inside the Select (see picker.tsx): the trigger's accessible
+              name is composed as [label, value] from the Label context. */}
+          <Label className="font-mono text-[10px] uppercase tracking-widest text-on-surface-variant/70">
             Leaves
-          </span>
-          <span className="relative flex items-center">
-            <select
-              value={estimate}
-              onChange={(event) => setEstimate(Number(event.target.value))}
-              disabled={!ready}
-              className="peer appearance-none cursor-pointer rounded-lg bg-surface-container-highest py-1.5 pl-2.5 pr-6 font-mono text-[11px] text-on-surface transition-colors hover:text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 [&>option]:bg-surface-container-highest [&>option]:text-on-surface"
-            >
+          </Label>
+          <Select.Trigger
+            type="button"
+            className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface-container-highest py-1.5 pl-2.5 pr-2 font-mono text-[11px] text-on-surface transition-colors hover:text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
+          >
+            <Select.Value />
+            <Select.Indicator className="size-2.5 shrink-0 text-on-surface-variant/60" />
+          </Select.Trigger>
+          <Select.Popover className="rounded-xl bg-surface-container-high p-1">
+            <ListBox className="font-mono text-[11px] text-on-surface">
               {ESTIMATES.map((leaves) => (
-                <option key={leaves} value={leaves}>
+                <ListBox.Item
+                  key={leaves}
+                  id={String(leaves)}
+                  className="cursor-pointer rounded-lg px-2.5 py-1.5 outline-none focus-visible:bg-surface-container-highest"
+                >
                   {leaves}
-                </option>
+                </ListBox.Item>
               ))}
-            </select>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 12 12"
-              className="pointer-events-none absolute right-1.5 top-1/2 size-2.5 -translate-y-1/2 text-on-surface-variant/60"
-            >
-              <path
-                d="M2 4.5 6 8.5 10 4.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-        </label>
+            </ListBox>
+          </Select.Popover>
+        </Select>
 
         {/* The project picker (Task 13) rides the same pill, after the leaf
             selector: assignment is optional, so "No project" is the honest

@@ -15,6 +15,17 @@ import {
 } from "@/components/tasks/summary-bento";
 import { dropNeighbours } from "@/lib/task-order";
 
+/*
+ * react-aria (via HeroUI Select) reads `<meta name=...>` through
+ * `CSS.escape` when a popover opens (its CSP-nonce lookup), and jsdom
+ * implements no `CSS` global at all — the popover crashed with
+ * "Cannot read properties of undefined (reading 'escape')". The escape
+ * only shapes a selector string; the plain identity stub is faithful.
+ */
+if (typeof globalThis.CSS === "undefined") {
+  globalThis.CSS = { escape: (value: string) => value } as typeof CSS;
+}
+
 /**
  * Task 10 gate: the "Today's Focus" panel.
  *
@@ -250,10 +261,15 @@ describe("adding a task", () => {
     expect(DEFAULT_ESTIMATE).toBe(2);
   });
 
-  it("submits the estimate the leaf selector was turned to", () => {
+  it("submits the estimate the leaf selector was turned to", async () => {
     const { onCreate } = renderList([]);
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "6" } });
+    // Phase 9: the leaf selector is a HeroUI Select — open the trigger,
+    // then pick the row from the listbox. The trigger's accessible name is
+    // the composed [label, value] ("Leaves 2" → "Leaves 6"), so match by
+    // the stable label part.
+    fireEvent.click(screen.getByRole("button", { name: /Leaves/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "6" }));
     fireEvent.change(screen.getByLabelText("New task title"), {
       target: { value: "Long thing" },
     });
@@ -295,7 +311,14 @@ describe("adding a task", () => {
 
     const input = screen.getByLabelText("New task title");
     expect(input).toHaveProperty("disabled", true);
-    expect(screen.getByRole("combobox")).toHaveProperty("disabled", true);
+    // Phase 9: the leaf selector is a HeroUI Select — react-aria marks the
+    // disabled state on the Select's root (`data-disabled`), keeps the
+    // trigger focusable for screen readers, and must refuse to open the
+    // listbox while the identity settles.
+    const leafTrigger = screen.getByRole("button", { name: /Leaves/ });
+    expect(leafTrigger.closest("[data-disabled]")).not.toBeNull();
+    fireEvent.click(leafTrigger);
+    expect(screen.queryByRole("listbox")).toBeNull();
 
     fireEvent.change(input, { target: { value: "Too early" } });
     fireEvent.submit(input.closest("form")!);
@@ -910,3 +933,4 @@ describe("the panel waits for an identity", () => {
     ]);
   });
 });
+

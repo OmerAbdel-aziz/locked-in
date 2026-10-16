@@ -13,18 +13,28 @@
  *      design-tokens gate still pins all 47 hexes. Do not extend this set —
  *      new surfaces use the HeroUI tokens in layer 2.
  *
- *   2. HEROUI THEMES (Phase 3.5b) — Mint (default, hue 155°), Airbnb (17°),
+ *   2. HEROUI THEMES (Phase 3.5b, five palettes since Phase 9) — Mint
+ *      (default, hue 155°), Neutral (0°), Blue (253.83°), Airbnb (17.07°),
  *      Rabbit (36.66°), each with a light and a dark variant, ported from
  *      docs/design/heroui-themes.css (the source-of-truth copy of the root
  *      temp.css). Values are verbatim except for the selector namespacing:
  *      the source repeats `:root/.light/.default/[data-theme="light"]` for
- *      all three palettes, which would collapse into one cascade — each
- *      palette instead resolves under its own `data-theme` name, with
- *      `-dark` for its dark mode. Mint is the default palette; `:root`
- *      carries mint-light per HeroUI convention, and layout.tsx sets
+ *      all palettes, which would collapse into one cascade — each palette
+ *      instead resolves under its own `data-theme` name, with `-dark` for
+ *      its dark mode. Mint is the default palette; `:root` carries
+ *      mint-light per HeroUI convention, and layout.tsx sets
  *      `data-theme="mint-dark"` so first paint stays the dark product.
  *
- *      Theme *switching UI* is Phase 5 — this is the token groundwork only.
+ *      The theme switcher lives in the settings dialog (Phase 9); the
+ *      selection is device-local (localStorage) — see lib/theme.ts.
+ *
+ *   3. LEGACY TOKEN RE-POINTING (Phase 9) — layer 1's utilities
+ *      (`bg-primary`, `text-on-surface`, `bg-surface-container-low`, …)
+ *      compile to `var(--color-*)`, which layer 1 freezes at mint-dark
+ *      hexes. Every one of those custom properties is re-declared at the
+ *      bottom of this file against the active theme's HeroUI vars, so the
+ *      utilities follow `data-theme` without a single component change.
+ *      This is the retirement 13.5b deviation 5 deferred.
  */
 
 /* ---- Layer 1: legacy Stitch tokens (Task 2, frozen) ---- */
@@ -203,6 +213,170 @@
   --cta-to: oklch(66% 0.14 155);
 }
 
+/* Neutral light (hue 0 — temp.css block 1) */
+[data-theme="neutral"] {
+  color-scheme: light;
+  --accent: oklch(0 0 0);
+  --accent-foreground: oklch(99.11% 0 0);
+  --accent-soft-foreground: oklch(0 0 0);
+  --background: oklch(97.02% 0 0);
+  --border: oklch(90% 0 0);
+  --danger: oklch(0.573 0.2249 21.97);
+  --danger-foreground: oklch(98% 0.02 21.97);
+  --default: oklch(94% 0 0);
+  --default-foreground: oklch(21.03% 0.0059 0);
+  --field-background: oklch(100% 0 0);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0 0);
+  --field-placeholder: oklch(55.17% 0 0);
+  --focus: oklch(0 0 0);
+  --foreground: oklch(21.03% 0 0);
+  --muted: oklch(55.17% 0 0);
+  --overlay: oklch(100% 0 0);
+  --overlay-foreground: oklch(21.03% 0 0);
+  --scrollbar: oklch(87.1% 0 0);
+  --segment: oklch(100% 0 0);
+  --segment-foreground: oklch(21.03% 0 0);
+  --separator: oklch(92% 0 0);
+  --success: oklch(0.6277 0.1604 153.06);
+  --success-foreground: oklch(98% 0.016 153.06);
+  --surface: oklch(100% 0 0);
+  --surface-foreground: oklch(21.03% 0 0);
+  --surface-secondary: oklch(95.24% 0 0);
+  --surface-secondary-foreground: oklch(21.03% 0 0);
+  --surface-tertiary: oklch(93.73% 0 0);
+  --surface-tertiary-foreground: oklch(21.03% 0 0);
+  --warning: oklch(0.8446 0.1525 80.6);
+  --warning-foreground: oklch(15% 0.0457 80.6);
+  --radius: 0.25rem;
+  --field-radius: 0.25rem;
+  /* CTA: black accent; a pure-black gradient has no darker sibling, so the
+     second stop lifts slightly to keep the 145° sheen visible. */
+  --cta-from: oklch(0 0 0);
+  --cta-to: oklch(20% 0 0);
+}
+
+/* Neutral dark */
+[data-theme="neutral-dark"] {
+  color-scheme: dark;
+  --accent: oklch(0.9848 0 0);
+  --accent-foreground: oklch(15% 0 0);
+  --accent-soft-foreground: oklch(0.9848 0 0);
+  --background: oklch(12% 0 0);
+  --border: oklch(28% 0 0);
+  --danger: oklch(0.7044 0.1872 23.19);
+  --danger-foreground: oklch(15% 0.05 23.19);
+  --default: oklch(27.4% 0 0);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.03% 0 0);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0 0);
+  --field-placeholder: oklch(70.5% 0 0);
+  --focus: oklch(0.9848 0 0);
+  --foreground: oklch(99.11% 0 0);
+  --muted: oklch(70.5% 0 0);
+  --overlay: oklch(21.03% 0 0);
+  --overlay-foreground: oklch(99.11% 0 0);
+  --scrollbar: oklch(70.5% 0 0);
+  --segment: oklch(39.64% 0 0);
+  --segment-foreground: oklch(99.11% 0 0);
+  --separator: oklch(25% 0 0);
+  --success: oklch(0.6514 0.1321 156.22);
+  --success-foreground: oklch(15% 0.0396 156.22);
+  --surface: oklch(21.03% 0 0);
+  --surface-foreground: oklch(99.11% 0 0);
+  --surface-secondary: oklch(25.7% 0 0);
+  --surface-secondary-foreground: oklch(99.11% 0 0);
+  --surface-tertiary: oklch(27.21% 0 0);
+  --surface-tertiary-foreground: oklch(99.11% 0 0);
+  --warning: oklch(0.8803 0.1348 86.06);
+  --warning-foreground: oklch(15% 0.0404 86.06);
+  --radius: 0.25rem;
+  --field-radius: 0.25rem;
+  --cta-from: oklch(0.9848 0 0);
+  --cta-to: oklch(0.85 0 0);
+}
+
+/* Blue light (hue 253.83 — temp.css block 2) */
+[data-theme="blue"] {
+  color-scheme: light;
+  --accent: oklch(62.04% 0.195 253.83);
+  --accent-foreground: oklch(99.11% 0 0);
+  --background: oklch(97.02% 0.0015 253.83);
+  --border: oklch(90% 0.0015 253.83);
+  --danger: oklch(65.32% 0.2335 25.74);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(94% 0.0015 253.83);
+  --default-foreground: oklch(21.03% 0.0059 253.83);
+  --field-background: oklch(100% 0.0008 253.83);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0.0015 253.83);
+  --field-placeholder: oklch(55.17% 0.003 253.83);
+  --focus: oklch(62.04% 0.195 253.83);
+  --foreground: oklch(21.03% 0.0015 253.83);
+  --muted: oklch(55.17% 0.003 253.83);
+  --overlay: oklch(100% 0.0004 253.83);
+  --overlay-foreground: oklch(21.03% 0.0015 253.83);
+  --scrollbar: oklch(87.1% 0.0015 253.83);
+  --segment: oklch(100% 0.0015 253.83);
+  --segment-foreground: oklch(21.03% 0.0015 253.83);
+  --separator: oklch(92% 0.0015 253.83);
+  --success: oklch(73.29% 0.1941 150.81);
+  --success-foreground: oklch(21.03% 0.0059 150.81);
+  --surface: oklch(100% 0.0008 253.83);
+  --surface-foreground: oklch(21.03% 0.0015 253.83);
+  --surface-secondary: oklch(95.24% 0.0012 253.83);
+  --surface-secondary-foreground: oklch(21.03% 0.0015 253.83);
+  --surface-tertiary: oklch(93.73% 0.0012 253.83);
+  --surface-tertiary-foreground: oklch(21.03% 0.0015 253.83);
+  --warning: oklch(78.19% 0.159 72.33);
+  --warning-foreground: oklch(21.03% 0.0059 72.33);
+  --radius: 0.5rem;
+  --field-radius: 0.75rem;
+  --cta-from: oklch(62.04% 0.195 253.83);
+  --cta-to: oklch(50% 0.195 253.83);
+}
+
+/* Blue dark */
+[data-theme="blue-dark"] {
+  color-scheme: dark;
+  --accent: oklch(62.04% 0.195 253.83);
+  --accent-foreground: oklch(99.11% 0 0);
+  --background: oklch(12% 0.0015 253.83);
+  --border: oklch(28% 0.0015 253.83);
+  --danger: oklch(59.4% 0.1973 24.63);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(27.4% 0.0015 253.83);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.03% 0.003 253.83);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0.0015 253.83);
+  --field-placeholder: oklch(70.5% 0.003 253.83);
+  --focus: oklch(62.04% 0.195 253.83);
+  --foreground: oklch(99.11% 0.0015 253.83);
+  --muted: oklch(70.5% 0.003 253.83);
+  --overlay: oklch(21.03% 0.003 253.83);
+  --overlay-foreground: oklch(99.11% 0.0015 253.83);
+  --scrollbar: oklch(70.5% 0.0015 253.83);
+  --segment: oklch(39.64% 0.0015 253.83);
+  --segment-foreground: oklch(99.11% 0.0015 253.83);
+  --separator: oklch(25% 0.0015 253.83);
+  --success: oklch(73.29% 0.1941 150.81);
+  --success-foreground: oklch(21.03% 0.0059 150.81);
+  --surface: oklch(21.03% 0.003 253.83);
+  --surface-foreground: oklch(99.11% 0.0015 253.83);
+  --surface-secondary: oklch(25.7% 0.0023 253.83);
+  --surface-secondary-foreground: oklch(99.11% 0.0015 253.83);
+  --surface-tertiary: oklch(27.21% 0.0023 253.83);
+  --surface-tertiary-foreground: oklch(99.11% 0.0015 253.83);
+  --warning: oklch(82.03% 0.1392 76.34);
+  --warning-foreground: oklch(21.03% 0.0059 76.34);
+  --radius: 0.5rem;
+  --field-radius: 0.75rem;
+  --cta-from: oklch(62.04% 0.195 253.83);
+  --cta-to: oklch(50% 0.195 253.83);
+}
+
 /* Airbnb light */
 [data-theme="airbnb"] {
   color-scheme: light;
@@ -357,6 +531,103 @@
   --warning-foreground: oklch(21.03% 0.0059 50.28);
   --cta-from: oklch(66.78% 0.2232 36.66);
   --cta-to: oklch(55% 0.2 36.66);
+}
+
+/*
+ * Legacy token re-pointing (Phase 9) — the retirement 13.5b deviation 5
+ * deferred.
+ *
+ * Layer 1's utilities (`bg-primary`, `text-on-surface`,
+ * `bg-surface-container-low`, …) compile to `var(--color-*)`, and layer 1
+ * freezes those at mint-dark hexes. Every component in the app speaks those
+ * utility names, so switching `data-theme` moved only the HeroUI internals
+ * while the product surface stayed mint-dark — light mode "didn't work" and
+ * no non-mint theme could ever recolor a button, a card, or the CTA.
+ *
+ * Each `--color-*` token is therefore re-declared here against the active
+ * theme's HeroUI vars. Same names, no new utilities, no component changes:
+ * `bg-primary` resolves to `var(--color-primary)`, which now resolves to
+ * `var(--accent)` under whatever `data-theme` carries. The @theme hexes
+ * remain as the pre-theme fallback (and the tokens gate still pins them).
+ *
+ * This block is unlayered CSS while Tailwind emits @theme inside
+ * `@layer theme` — unlayered rules beat layered ones regardless of source
+ * order, so the mapping always wins when a theme is present.
+ *
+ * Ladder mapping rationale (dark values in parentheses): the legacy
+ * surface-container scale rises darkest → lightest, so it lands on the
+ * HeroUI scale in the same order — background (12%) → surface (21%) →
+ * surface-secondary (25.7%) → surface-tertiary (27.2%) → segment (39.6%).
+ * Tertiary is the design's "errors notify without panic" coral, so it
+ * follows --danger; secondary is its soft echo, so it follows --muted.
+ */
+:root,
+[data-theme] {
+  /* Primary */
+  --color-primary: var(--accent);
+  --color-on-primary: var(--accent-foreground);
+  --color-primary-container: var(--accent);
+  --color-on-primary-container: var(--accent-foreground);
+  --color-inverse-primary: var(--accent);
+  --color-primary-fixed: var(--accent);
+  --color-primary-fixed-dim: var(--accent);
+  --color-on-primary-fixed: var(--accent-foreground);
+  --color-on-primary-fixed-variant: var(--accent-foreground);
+  --color-surface-tint: var(--accent);
+
+  /* Secondary */
+  --color-secondary: var(--muted);
+  --color-on-secondary: var(--background);
+  --color-secondary-container: var(--surface-secondary);
+  --color-on-secondary-container: var(--foreground);
+  --color-secondary-fixed: var(--muted);
+  --color-secondary-fixed-dim: var(--muted);
+  --color-on-secondary-fixed: var(--background);
+  --color-on-secondary-fixed-variant: var(--background);
+
+  /* Tertiary (coral notice) + error — both follow the theme's danger */
+  --color-tertiary: var(--danger);
+  --color-on-tertiary: var(--danger-foreground);
+  --color-tertiary-container: var(--danger);
+  --color-on-tertiary-container: var(--danger-foreground);
+  --color-tertiary-fixed: var(--danger);
+  --color-tertiary-fixed-dim: var(--danger);
+  --color-on-tertiary-fixed: var(--danger-foreground);
+  --color-on-tertiary-fixed-variant: var(--danger-foreground);
+  --color-error: var(--danger);
+  --color-on-error: var(--danger-foreground);
+  --color-error-container: var(--danger);
+  --color-on-error-container: var(--danger-foreground);
+
+  /* Surfaces */
+  --color-background: var(--background);
+  --color-on-background: var(--foreground);
+  --color-surface: var(--surface);
+  --color-on-surface: var(--foreground);
+  --color-surface-variant: var(--surface-secondary);
+  --color-on-surface-variant: var(--muted);
+  --color-surface-dim: var(--surface);
+  --color-surface-bright: var(--surface-secondary);
+  --color-surface-container-lowest: var(--background);
+  --color-surface-container-low: var(--surface);
+  --color-surface-container: var(--surface-secondary);
+  --color-surface-container-high: var(--surface-tertiary);
+  --color-surface-container-highest: var(--segment);
+  --color-inverse-surface: var(--foreground);
+  --color-inverse-on-surface: var(--background);
+
+  /* Outlines — ghost borders follow the theme's border/muted */
+  --color-outline: var(--muted);
+  --color-outline-variant: var(--border);
+
+  /* Chart series (HeroUI Pro's own convention, ported so the hand-rolled
+     stats charts follow the theme instead of shipping mint forever): the
+     palette centers on the accent and fans out darker/lighter. */
+  --chart-1: oklch(from var(--accent) calc(l - 0.24) c h);
+  --chart-2: oklch(from var(--accent) calc(l - 0.12) c h);
+  --chart-3: var(--accent);
+  --chart-4: oklch(from var(--accent) calc(l + 0.12) c h);
+  --chart-5: oklch(from var(--accent) calc(l + 0.24) c h);
 }
 
 /*

@@ -1,15 +1,15 @@
 /*
  * The stats surface — Tasks 20–22, PRD §4.1 (new route `/stats`).
  *
- * Same two-column shell as the focus screen (ADR-004): the header carries
- * the Focus/Stats nav, the main column holds the range selector, charts,
- * trends, time-of-day, breakdowns and history. No 1px divider borders for
- * sectioning anywhere — boundaries are tonal shifts, per DESIGN.md.
+ * Same shell as the focus screen (ADR-004): the header carries the shared
+ * Focus/Stats/Settings pill (Phase 9), the main column holds the range
+ * selector, charts, trends, time-of-day, breakdowns and history. No 1px
+ * divider borders for sectioning anywhere — boundaries are tonal shifts,
+ * per DESIGN.md.
  */
 
-import Link from "next/link";
-
 import { StatusFooter } from "@/components/chrome/status-footer";
+import { NavPill } from "@/components/chrome/nav-pill";
 import { StreakBadge } from "@/components/chrome/streak-badge";
 import { StatsPanel } from "@/components/stats/stats-panel";
 
@@ -17,24 +17,15 @@ export default function StatsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex h-16 w-full items-center justify-between px-8">
-        <div className="text-xl font-bold tracking-tighter text-on-surface">
-          Locked In
+        <div className="flex items-center gap-4">
+          <div className="text-xl font-bold tracking-tighter text-on-surface">
+            Locked In
+          </div>
+          {/* Phase 9: the shared pill also carries the Settings dialog,
+              which previously mounted only on `/` — without it this item
+              would be dead on arrival here. */}
+          <NavPill />
         </div>
-
-        <nav className="flex items-center gap-1 rounded-full bg-surface-container-low/60 p-1 text-xs font-semibold">
-          <Link
-            href="/"
-            className="rounded-full px-3 py-1 text-on-surface-variant"
-          >
-            Focus
-          </Link>
-          <span
-            aria-current="page"
-            className="rounded-full bg-surface-container-highest px-3 py-1 text-on-surface"
-          >
-            Stats
-          </span>
-        </nav>
 
         <div className="flex items-center gap-2">
           <StreakBadge />

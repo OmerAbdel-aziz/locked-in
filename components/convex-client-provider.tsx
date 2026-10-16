@@ -7,6 +7,7 @@ import { useEffect, type ReactNode } from "react";
 import { SessionLogger } from "@/components/session-logger";
 import { PhaseNotice } from "@/components/settings/phase-notice";
 import { SettingsSync } from "@/components/settings/settings-sync";
+import { ThemeSync } from "@/components/theme-sync";
 
 /**
  * Client-side Convex wiring — Task 4.
@@ -62,6 +63,10 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <ConvexAuthProvider client={convex}>
       <AnonymousIdentity />
+      {/* Phase 9: the stored appearance theme lands on <html> at mount —
+          outside the auth tree's concerns but inside the one component
+          every route already mounts. */}
+      <ThemeSync />
       {/* A sibling of the identity, not a child of any page: both are
           conditions the app starts with, and a completed session must find
           a writer no matter which route was showing. */}

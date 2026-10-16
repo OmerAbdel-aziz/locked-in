@@ -345,13 +345,18 @@ describe("the engine is wired to the store", () => {
   });
 
   it("repositions the engine from the tabs without touching the cycle", () => {
-    // The tabs live in the header, so the page is what has to be rendered.
+    // The tabs sit above the ring in the timer column, so the page is what
+    // has to be rendered.
     render(<Page />);
 
     act(() => useTimerStore.getState().start());
     act(() => useTimerStore.getState().skip());
     // Now on a short break, still owing session 1.
     expect(useTimerStore.getState().state.cyclePosition).toBe(1);
+
+    // The break auto-starts, and the tabs stay disabled while anything
+    // runs (Phase 9) — pause first so the switch is armed.
+    act(() => useTimerStore.getState().pause());
 
     fireEvent.click(screen.getByRole("tab", { name: "Long Break" }));
 
@@ -398,6 +403,68 @@ describe("the page keeps the canonical two-column composition (ADR-004)", () => 
     fireEvent.click(screen.getByRole("button", { name: "Start Focus Session" }));
     expect(useTimerStore.getState().state.status).toBe("running");
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+  });
+
+  it("mounts the mode tabs above the ring, not in the header", () => {
+    const { container } = render(<Page />);
+
+    // The header keeps logo + status cluster only — no tablist.
+    const header = container.querySelector("header")!;
+    expect(header.querySelector('[role="tablist"]')).toBeNull();
+
+    // The tablist precedes the engine section in DOM order.
+    const tablist = container.querySelector('[role="tablist"]');
+    const engine = screen.getByRole("region", { name: "Timer engine" });
+    expect(tablist).toBeTruthy();
+    expect(
+      tablist!.compareDocumentPosition(engine) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("disables the mode tabs while the timer runs", () => {
+    // Grill ruling (Phase 9): selecting a tab abandons the run with no
+    // session logged, so a mid-run tap — now above the digits — must not
+    // reposition the engine.
+    render(<Page />);
+
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    expect(tab("Focus").getAttribute("aria-disabled")).not.toBe("true");
+
+    act(() => useTimerStore.getState().start());
+    expect(tab("Focus").getAttribute("aria-disabled")).toBe("true");
+    expect(tab("Short Break").getAttribute("aria-disabled")).toBe("true");
+
+    // The disabled tap abandons nothing: still a running focus.
+    fireEvent.click(tab("Short Break"));
+    expect(useTimerStore.getState().state.phase).toBe("focus");
+    expect(useTimerStore.getState().state.status).toBe("running");
+
+    // Pausing re-arms the switch.
+    act(() => useTimerStore.getState().pause());
+    expect(tab("Focus").getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("centers the timer full-width and unmounts the task column under the shroud", () => {
+    // Grill ruling (Phase 9): the right column goes away rather than
+    // dimming — the veil is pointer-events-none, so a dimmed column would
+    // stay clickable beneath it.
+    const { container } = render(<Page />);
+    const main = container.querySelector("main")!;
+    expect(main.children).toHaveLength(2);
+
+    act(() => useTimerStore.getState().start());
+    expect(main.children).toHaveLength(1);
+    const column = screen.getByTestId("shroud-column");
+    expect(column.className).toContain("lg:col-span-12");
+    expect(column.className).not.toContain("lg:col-span-7");
+    expect(screen.queryByRole("region", { name: "Today's Focus" })).toBeNull();
+
+    // The phase ending restores the 7/5 dashboard composition.
+    act(() => useTimerStore.getState().skip());
+    expect(main.children).toHaveLength(2);
+    expect(column.className).toContain("lg:col-span-7");
+    expect(screen.getByRole("region", { name: "Today's Focus" })).toBeTruthy();
   });
 });
 

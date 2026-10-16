@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { toTaskRows } from "@/components/tasks/task-panel";
@@ -13,6 +14,17 @@ import {
   ProjectOverviewView,
   type OverviewData,
 } from "@/components/projects/overview";
+
+/*
+ * react-aria (via HeroUI Select) reads `<meta name=...>` through
+ * `CSS.escape` when a popover opens (its CSP-nonce lookup), and jsdom
+ * implements no `CSS` global at all — the popover crashed with
+ * "Cannot read properties of undefined (reading 'escape')". The escape
+ * only shapes a selector string; the plain identity stub is faithful.
+ */
+if (typeof globalThis.CSS === "undefined") {
+  globalThis.CSS = { escape: (value: string) => value } as typeof CSS;
+}
 
 /**
  * Tasks 13 + 14 gate: the project picker, the filter chips, the CRUD
@@ -108,7 +120,7 @@ describe("the filter chips", () => {
 });
 
 describe("the picker", () => {
-  it("offers No project plus every active project", () => {
+  it("offers No project plus every active project", async () => {
     const onChange = vi.fn();
     render(
       <ProjectPicker
@@ -118,32 +130,58 @@ describe("the picker", () => {
       />,
     );
 
-    const select = screen.getByLabelText("Project for the new task");
-    const options = Array.from(select.querySelectorAll("option")).map(
-      (option) => option.textContent,
-    );
-    expect(options).toEqual(["No project", "Ship Q2"]);
+    // HeroUI Select (Phase 9): the options live in a listbox popover that
+    // opens from the trigger, not in static <option> markup. The trigger's
+    // accessible name is the composed [label, value] ("Project No
+    // project"), so match by the stable label part.
+    fireEvent.click(screen.getByRole("button", { name: /Project/ }));
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "No project",
+      "Ship Q2",
+    ]);
   });
 
-  it("reads the empty option as unassigned, not as a project called nothing", () => {
+  it("reads the empty option as unassigned, not as a project called nothing", async () => {
     const onChange = vi.fn();
-    render(
-      <ProjectPicker
-        projects={[{ id: "p1", name: "Ship Q2" }]}
-        value="p1"
-        onChange={onChange}
-      />,
+    // The picker is controlled — the panel owns the value — and react-aria
+    // fires no change when a re-clicked option is *already* selected, so a
+    // spy that never feeds `value` back would make the second selection look
+    // broken when it is the harness that is stale. This one stores it, which
+    // also proves the sentinel round-trips through the trigger's text.
+    function Harness() {
+      const [value, setValue] = useState<string | null>("p1");
+      return (
+        <ProjectPicker
+          projects={[{ id: "p1", name: "Ship Q2" }]}
+          value={value}
+          onChange={(next) => {
+            onChange(next);
+            setValue(next);
+          }}
+        />
+      );
+    }
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Project/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "No project" }));
+    expect(onChange).toHaveBeenCalledWith(null);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Project/ }).textContent,
+      ).toContain("No project"),
     );
 
-    fireEvent.change(screen.getByLabelText("Project for the new task"), {
-      target: { value: "" },
-    });
-    expect(onChange).toHaveBeenCalledWith(null);
-
-    fireEvent.change(screen.getByLabelText("Project for the new task"), {
-      target: { value: "p1" },
-    });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /Project/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Ship Q2" }));
     expect(onChange).toHaveBeenCalledWith("p1");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Project/ }).textContent,
+      ).toContain("Ship Q2"),
+    );
   });
 
   it("is held shut until there is an identity to create under", () => {
@@ -156,10 +194,14 @@ describe("the picker", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Project for the new task")).toHaveProperty(
-      "disabled",
-      true,
-    );
+    const trigger = screen.getByRole("button", { name: /Project/ });
+    // react-aria marks the disabled state on the Select's root element
+    // (`data-disabled`), keeps the trigger focusable so screen readers can
+    // still reach it, and the real guarantee is behavioral: the listbox
+    // never opens.
+    expect(trigger.closest("[data-disabled]")).not.toBeNull();
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });
 
@@ -198,7 +240,8 @@ describe("the add pill with a picker", () => {
   it("shows no picker until projects exist", () => {
     renderList();
 
-    expect(screen.queryByLabelText("Project for the new task")).toBeNull();
+    // No picker at all: no trigger button carrying the Project label.
+    expect(screen.queryByRole("button", { name: /Project/ })).toBeNull();
   });
 
   it("files the task under the picker's project", () => {
@@ -217,11 +260,13 @@ describe("the add pill with a picker", () => {
       />,
     );
 
-    // The picker is controlled by the panel, so the selected option is the
-    // picker's value — and the create carries exactly that value.
+    // The picker is controlled by the panel, so the trigger shows the
+    // picker's value — and the create carries exactly that value. (Phase 9:
+    // HeroUI Select renders the value as the trigger's text, not a `value`
+    // property on a native select.)
     expect(
-      screen.getByLabelText("Project for the new task"),
-    ).toHaveProperty("value", "p1");
+      screen.getByRole("button", { name: /Project/ }).textContent,
+    ).toContain("Ship Q2");
 
     fireEvent.change(screen.getByLabelText("New task title"), {
       target: { value: "Build it" },
@@ -526,3 +571,4 @@ describe("the overview card", () => {
     expectNoForbiddenChrome(container.innerHTML);
   });
 });
+

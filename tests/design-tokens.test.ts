@@ -114,10 +114,14 @@ describe("DESIGN.md binding rules (as amended by Phase 3.5)", () => {
     expect(root).toContain("color: var(--foreground, var(--color-on-surface))");
   });
 
-  it("resolves three palettes × light/dark via data-theme", () => {
+  it("resolves five palettes × light/dark via data-theme", () => {
     for (const theme of [
       "mint",
       "mint-dark",
+      "neutral",
+      "neutral-dark",
+      "blue",
+      "blue-dark",
       "airbnb",
       "airbnb-dark",
       "rabbit",
@@ -126,12 +130,42 @@ describe("DESIGN.md binding rules (as amended by Phase 3.5)", () => {
       expect(css).toContain(`[data-theme="${theme}"]`);
     }
     // Each dark variant declares a dark scheme; each light one a light scheme.
-    for (const theme of ["mint-dark", "airbnb-dark", "rabbit-dark"]) {
+    for (const theme of [
+      "mint-dark",
+      "neutral-dark",
+      "blue-dark",
+      "airbnb-dark",
+      "rabbit-dark",
+    ]) {
       const block = css.match(
         new RegExp(`\\[data-theme="${theme}"\\]\\s*\\{[^}]*\\}`),
       )?.[0];
       expect(block).toContain("color-scheme: dark");
     }
+  });
+
+  it("re-points every legacy --color-* token at a theme variable (Phase 9)", () => {
+    // The regression that shipped light-mode-broken: utilities compile to
+    // var(--color-*), which the @theme block freezes at mint-dark hexes.
+    // Every token must be re-declared against a HeroUI var under :root /
+    // [data-theme], or the theme switcher cannot recolor the product.
+    const mappingBlock =
+      css.match(/:root,\s*\[data-theme\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(mappingBlock).not.toBe("");
+
+    const missing: string[] = [];
+    for (const name of Object.keys(colors)) {
+      if (
+        !new RegExp(`--color-${name}:\\s*var\\(--`).test(mappingBlock)
+      ) {
+        missing.push(name);
+      }
+    }
+    expect(missing).toEqual([]);
+
+    // And the mapping must live in unlayered CSS so it beats Tailwind's
+    // @layer theme emission of the frozen hexes.
+    expect(css).toMatch(/:root,\s*\[data-theme\]\s*\{/);
   });
 
   it("gives every theme its own two-stop CTA gradient at the fixed 145° geometry", () => {

@@ -12,6 +12,16 @@ import type { DayBucket } from "@/lib/aggregations";
 
 export const SESSIONS_CHART_HEIGHT = 96;
 
+/**
+ * Landscape floor for the viewBox (Phase 9 fix) — same reasoning as
+ * `focus-chart.tsx`: a portrait viewBox × `w-full` scaled the 7-day range
+ * to ~700px tall and a 1-day custom range to thousands. 30 days (420)
+ * exceeds the 342-unit floor and renders bit-identical.
+ */
+const MIN_VIEWBOX_WIDTH = 3 * (SESSIONS_CHART_HEIGHT + 18);
+const DAY_SLOT = 14;
+const BAR_WIDTH = 10;
+
 export function SessionsChartView({ days }: { days: DayBucket[] }) {
   const heights = computeBarHeights(
     days.map((day) => day.sessions),
@@ -19,8 +29,9 @@ export function SessionsChartView({ days }: { days: DayBucket[] }) {
   );
   const total = days.reduce((sum, day) => sum + day.sessions, 0);
 
-  const width = Math.max(days.length * 14, 1);
-  const barWidth = days.length === 0 ? 0 : Math.min(10, width / days.length - 4);
+  const width = Math.max(days.length * DAY_SLOT, MIN_VIEWBOX_WIDTH);
+  const barWidth = days.length === 0 ? 0 : BAR_WIDTH;
+  const offsetX = (width - days.length * DAY_SLOT) / 2;
 
   return (
     <div className="rounded-2xl bg-surface-container-low/30 p-5">
@@ -47,13 +58,16 @@ export function SessionsChartView({ days }: { days: DayBucket[] }) {
             x2="1"
             y2="1"
           >
-            <stop offset="0%" stopColor="#4be277" />
-            <stop offset="100%" stopColor="#22c55e" />
+            {/* `var()` is invalid in presentation attributes, so the stops
+                are inline styles; the series follows the active theme's
+                accent (--chart-3 over its darker sibling --chart-1). */}
+            <stop offset="0%" style={{ stopColor: "var(--chart-3)" }} />
+            <stop offset="100%" style={{ stopColor: "var(--chart-1)" }} />
           </linearGradient>
         </defs>
         {days.map((day, index) => {
           const height = heights[index];
-          const x = index * 14 + (14 - barWidth) / 2;
+          const x = offsetX + index * DAY_SLOT + (DAY_SLOT - barWidth) / 2;
           const labelEvery = Math.max(1, Math.ceil(days.length / 8));
           return (
             <g key={day.dayKey}>
@@ -71,11 +85,11 @@ export function SessionsChartView({ days }: { days: DayBucket[] }) {
               />
               {index % labelEvery === 0 && (
                 <text
-                  x={index * 14 + 7}
+                  x={offsetX + index * DAY_SLOT + DAY_SLOT / 2}
                   y={SESSIONS_CHART_HEIGHT + 14}
                   textAnchor="middle"
                   fontSize="9"
-                  fill="#bccbb9"
+                  style={{ fill: "var(--muted)" }}
                 >
                   {day.dayKey.slice(8, 10)}
                 </text>

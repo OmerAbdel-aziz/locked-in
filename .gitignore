@@ -49,3 +49,6 @@ opencode.json
 
 # scratch
 .stitchtmp/
+
+.vercel
+.env*

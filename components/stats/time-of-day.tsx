@@ -52,7 +52,7 @@ export function TimeOfDayView({ hours }: { hours: number[] }) {
                 width={6}
                 height={Math.max(height, 0)}
                 rx={2}
-                fill="#4be277"
+                style={{ fill: "var(--chart-3)" }}
                 opacity={peak !== 0 && hour === peakHour ? 1 : 0.3}
                 data-hour={hour}
                 data-bar-height={Math.round(height * 100) / 100}
@@ -63,7 +63,7 @@ export function TimeOfDayView({ hours }: { hours: number[] }) {
                   y={72}
                   textAnchor="middle"
                   fontSize="8"
-                  fill="#bccbb9"
+                  style={{ fill: "var(--muted)" }}
                 >
                   {String(hour).padStart(2, "0")}
                 </text>
