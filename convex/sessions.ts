@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 
+import type { Id } from "./_generated/dataModel";
 import { currentStreak } from "../lib/streak";
 import { requireOwnedProject, resolveOwner, taskIfYours } from "./lib/owner";
 import { mutation, query } from "./_generated/server";
@@ -193,3 +194,192 @@ export const streak = query({
 
 /** Enough history to find the first gap; see `streak` above. */
 const STREAK_SCAN_LIMIT = 1000;
+
+/**
+ * History export for CSV (Task 25).
+ *
+ * Returns the caller's sessions with task/project display names resolved, so
+ * the client can serialize with `lib/csv.ts` (6 cols, Q7b). Bounded like
+ * every other list query; sessions are already in completedAt order from the
+ * index. Dangling bindings read as "" (unbound) rather than throwing —
+ * export must never fail over a cleared task.
+ */
+export const exportLog = query({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await resolveOwner(ctx);
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_owner_completed", (q) => q.eq("ownerId", ownerId))
+      .take(5000);
+    const out: Array<{
+      startedAt: number;
+      completedAt: number;
+      phase: "focus" | "short" | "long";
+      task: string;
+      project: string;
+      tzOffsetAtCompletion: number;
+    }> = [];
+    for (const s of sessions) {
+      let task = "";
+      if (s.taskId !== undefined) {
+        const t = await ctx.db.get(s.taskId);
+        if (t && t.ownerId === ownerId) task = t.title;
+      }
+      let project = "";
+      if (s.projectId !== undefined) {
+        const p = await ctx.db.get(s.projectId);
+        if (p && p.ownerId === ownerId) project = p.name;
+      }
+      out.push({
+        startedAt: s.startedAt,
+        completedAt: s.completedAt,
+        phase: s.phase,
+        task,
+        project,
+        tzOffsetAtCompletion: s.tzOffsetAtCompletion,
+      });
+    }
+    return out;
+  },
+});
+
+/**
+ * CSV import (Task 25, Q8b).
+ *
+ * The client parses text with `lib/csv.ts` (row-level errors there) and sends
+ * only the VALID rows here. This mutation re-validates every row with the
+ * same rules as `logCompleted` (same path, per PRD §6), resolves task/project
+ * NAMES case-insensitively, and dedupes full-row matches (Q3).
+ *
+ * Q8: unknown task/project names REJECT the row (no auto-create — that would
+ * let a typo pollute the 100-active project cap). Archived projects resolve
+ * like open ones (history keeps attribution, PRD §6).
+ *
+ * Returns per-row results aligned with the input order: `{ ok: true, id }`
+ * for writes AND for idempotent repeats, `{ ok: false, error }` for rejects.
+ */
+export const importRows = mutation({
+  args: {
+    rows: v.array(
+      v.object({
+        startedAt: v.number(),
+        completedAt: v.number(),
+        phase: v.union(
+          v.literal("focus"),
+          v.literal("short"),
+          v.literal("long"),
+        ),
+        task: v.string(),
+        project: v.string(),
+        tzOffsetAtCompletion: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+    if (args.rows.length > 500) {
+      throw new Error("sessions: import capped at 500 rows per call");
+    }
+
+    // Name resolution maps (case-insensitive, Q8): unknown names reject.
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(1000);
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(1000);
+    const taskByName = new Map<string, typeof tasks[number]>();
+    for (const t of tasks) {
+      const k = t.title.trim().toLowerCase();
+      if (!taskByName.has(k)) taskByName.set(k, t);
+    }
+    const projectByName = new Map<string, typeof projects[number]>();
+    for (const p of projects) {
+      const k = p.name.trim().toLowerCase();
+      if (!projectByName.has(k)) projectByName.set(k, p);
+    }
+
+    const results: Array<
+      | { ok: true; id: string; duplicate: boolean }
+      | { ok: false; error: string }
+    > = [];
+    for (const row of args.rows) {
+      if (
+        !Number.isFinite(row.startedAt) ||
+        row.startedAt < MIN_TIMESTAMP_MS ||
+        !Number.isFinite(row.completedAt) ||
+        row.completedAt < row.startedAt ||
+        !Number.isInteger(row.tzOffsetAtCompletion) ||
+        row.tzOffsetAtCompletion < MIN_UTC_OFFSET ||
+        row.tzOffsetAtCompletion > MAX_UTC_OFFSET
+      ) {
+        results.push({ ok: false, error: "invalid timestamps or tz offset" });
+        continue;
+      }
+      let taskId: Id<"tasks"> | undefined = undefined;
+      if (row.task.trim() !== "") {
+        const found = taskByName.get(row.task.trim().toLowerCase());
+        if (!found) {
+          results.push({
+            ok: false,
+            error: `unknown task "${row.task}" (no auto-create; create it first)`,
+          });
+          continue;
+        }
+        taskId = found._id;
+      }
+      let projectId: Id<"projects"> | undefined = undefined;
+      if (row.project.trim() !== "") {
+        const found = projectByName.get(row.project.trim().toLowerCase());
+        if (!found) {
+          results.push({
+            ok: false,
+            error: `unknown project "${row.project}" (no auto-create; create it first)`,
+          });
+          continue;
+        }
+        projectId = found._id;
+      }
+      // Full-row dedupe (Q3): same completion instant + same binding + tz.
+      const existing = await ctx.db
+        .query("sessions")
+        .withIndex("by_owner_completed", (q) =>
+          q.eq("ownerId", ownerId).eq("completedAt", row.completedAt),
+        )
+        .first();
+      if (
+        existing &&
+        existing.startedAt === row.startedAt &&
+        existing.phase === row.phase &&
+        (existing.taskId ?? undefined) === (taskId ?? undefined) &&
+        (existing.projectId ?? undefined) === (projectId ?? undefined) &&
+        existing.tzOffsetAtCompletion === row.tzOffsetAtCompletion
+      ) {
+        results.push({
+          ok: true,
+          id: existing._id,
+          duplicate: true,
+        });
+        continue;
+      }
+      const id = await ctx.db.insert("sessions", {
+        ownerId,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
+        phase: row.phase,
+        taskId,
+        projectId,
+        tzOffsetAtCompletion: row.tzOffsetAtCompletion,
+      });
+      results.push({
+        ok: true,
+        id,
+        duplicate: false,
+      });
+    }
+    return results;
+  },
+});

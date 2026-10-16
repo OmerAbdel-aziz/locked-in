@@ -10,8 +10,10 @@
 
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
+import type * as lib_merge from "../lib/merge.js";
 import type * as lib_order from "../lib/order.js";
 import type * as lib_owner from "../lib/owner.js";
+import type * as merge from "../merge.js";
 import type * as projects from "../projects.js";
 import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
@@ -27,8 +29,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
+  "lib/merge": typeof lib_merge;
   "lib/order": typeof lib_order;
   "lib/owner": typeof lib_owner;
+  merge: typeof merge;
   projects: typeof projects;
   sessions: typeof sessions;
   settings: typeof settings;
