@@ -52,14 +52,9 @@ export function ProjectFilter({ projects, value, onChange }: ProjectFilterProps)
     >
       <Button
         size="sm"
-        variant="ghost"
+        variant={value === null ? "secondary" : "ghost"}
         aria-pressed={value === null}
         onPress={() => onChange(null)}
-        className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 ${
-          value === null
-            ? "bg-primary/15 text-primary"
-            : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-        }`}
       >
         All
       </Button>
@@ -70,14 +65,9 @@ export function ProjectFilter({ projects, value, onChange }: ProjectFilterProps)
           <Button
             key={project.id}
             size="sm"
-            variant="ghost"
+            variant={selected ? "secondary" : "ghost"}
             aria-pressed={selected}
             onPress={() => onChange(project.id)}
-            className={`max-w-44 truncate rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 ${
-              selected
-                ? "bg-primary/15 text-primary"
-                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-            }${project.archived && !selected ? " opacity-50" : ""}`}
           >
             {project.name}
           </Button>

@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { Button } from "@heroui/react";
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -28,13 +29,13 @@ function SignedInBadge({ email }: { email: string | null }) {
           {email}
         </span>
       )}
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
+      <Button
+        size="sm"
+        variant="secondary"
+        onPress={() => void signOut()}
       >
         Sign out
-      </button>
+      </Button>
     </div>
   );
 }

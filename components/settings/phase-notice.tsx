@@ -15,6 +15,7 @@
  */
 
 import { useEffect } from "react";
+import { Button } from "@heroui/react";
 
 import { phaseEndMessage } from "@/lib/notify";
 import { useTimerStore } from "@/lib/store/timer";
@@ -50,14 +51,14 @@ export function PhaseNotice() {
           <p className="text-sm font-bold text-on-surface">{title}</p>
           <p className="mt-1 text-xs text-on-surface-variant">{body}</p>
         </div>
-        <button
-          type="button"
-          onClick={dismissNotice}
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={dismissNotice}
           aria-label="Dismiss notification"
-          className="rounded-lg px-2 py-1 text-xs font-bold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-highest hover:text-on-surface"
         >
           Dismiss
-        </button>
+        </Button>
       </div>
     </div>
   );

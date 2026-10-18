@@ -13,6 +13,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { Button } from "@heroui/react";
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -79,12 +80,9 @@ export default function LoginPage() {
             className="rounded-2xl bg-surface-container-low px-5 py-3 text-sm text-on-surface outline-none"
           />
           {error !== null && <p className="text-sm text-error">{error}</p>}
-          <button
-            type="submit"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-on-primary"
-          >
+          <Button type="submit" variant="primary">
             Send sign-in link
-          </button>
+          </Button>
         </form>
       )}
     </div>

@@ -106,16 +106,14 @@ describe("the filter chips", () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("keeps an archived project's chip, rendered muted", () => {
+  it("keeps an archived project's chip so its tasks stay isolable", () => {
     render(<ProjectFilter projects={PROJECTS} value={null} onChange={vi.fn()} />);
 
     // Archived tasks are still on the board with muted tags — hiding the
-    // chip would strand them with no way to isolate them.
-    const chip = screen.getByRole("button", { name: "Old work" });
-    expect(chip.className).toContain("opacity-50");
-    expect(
-      screen.getByRole("button", { name: "Ship Q2" }).className,
-    ).not.toContain("opacity-50");
+    // chip would strand them with no way to isolate them. Chips are now
+    // standard HeroUI buttons, so the archived one renders like the rest.
+    expect(screen.getByRole("button", { name: "Old work" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Old work" }));
   });
 });
 

@@ -24,6 +24,7 @@
 
 import { useEffect, useSyncExternalStore, useState } from "react";
 import { useConvexAuth } from "@convex-dev/auth/react";
+import { Button } from "@heroui/react";
 import { useMutation, useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -122,9 +123,10 @@ export function MergePrompt() {
       </p>
       {!confirmingDiscard ? (
         <div className="mt-4 flex gap-3">
-          <button
+          <Button
             type="button"
-            onClick={() =>
+            variant="primary"
+            onPress={() =>
               void execute({ deviceOwnerId: deviceOwner }).then((r) => {
                 forgetDevice();
                 setDone(
@@ -132,33 +134,25 @@ export function MergePrompt() {
                 );
               })
             }
-            className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-on-primary"
           >
             Merge (recommended)
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingDiscard(true)}
-            className="rounded-full bg-surface-bright px-4 py-2 text-sm font-bold text-on-surface"
-          >
+          </Button>
+          <Button type="button" variant="secondary" onPress={() => setConfirmingDiscard(true)}>
             Use account instead
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="mt-4 flex gap-3">
           <p className="text-sm text-tertiary">
             This permanently deletes the device data. Are you sure?
           </p>
-          <button
-            type="button"
-            onClick={() => setConfirmingDiscard(false)}
-            className="rounded-full bg-surface-bright px-4 py-2 text-sm font-bold text-on-surface"
-          >
+          <Button type="button" variant="secondary" onPress={() => setConfirmingDiscard(false)}>
             Back
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            onClick={() =>
+            variant="danger"
+            onPress={() =>
               void discard({ deviceOwnerId: deviceOwner }).then((r) => {
                 forgetDevice();
                 setDone(
@@ -166,10 +160,9 @@ export function MergePrompt() {
                 );
               })
             }
-            className="rounded-full bg-error px-4 py-2 text-sm font-bold text-on-error"
           >
             Delete device data
-          </button>
+          </Button>
         </div>
       )}
     </div>

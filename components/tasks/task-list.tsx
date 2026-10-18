@@ -21,6 +21,7 @@
  */
 
 import { useState, type DragEvent } from "react";
+import { Button } from "@heroui/react";
 
 import { dropNeighbours, type DropPosition } from "@/lib/task-order";
 
@@ -214,14 +215,15 @@ export function TaskList<Id extends string>({
       {/* PRD §4.2's bulk action. Never hidden — an action that disappears
           teaches people it is unreliable — but inert until there is
           something it could clear. */}
-      <button
+      <Button
         type="button"
-        onClick={onClearCompleted}
-        disabled={finished.length === 0}
-        className="mt-6 rounded-lg px-3 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-30"
+        variant="ghost"
+        className="mt-6"
+        isDisabled={finished.length === 0}
+        onPress={onClearCompleted}
       >
         Clear completed
-      </button>
+      </Button>
     </section>
   );
 }

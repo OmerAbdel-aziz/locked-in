@@ -12,8 +12,9 @@
  * /login until the Task 16 settings dialog exists to host it.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useConvexAuth } from "@convex-dev/auth/react";
+import { Button } from "@heroui/react";
 import { useMutation, useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -25,6 +26,7 @@ export function DataIo() {
   const sessions = useQuery(api.sessions.exportLog, authed ? {} : "skip");
   const importRows = useMutation(api.sessions.importRows);
   const [report, setReport] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!authed) return null;
 
@@ -78,27 +80,32 @@ export function DataIo() {
         names are rejected — create them first.
       </p>
       <div className="mt-4 flex items-center gap-3">
-        <button
+        <Button
           type="button"
-          onClick={onExport}
-          disabled={!sessions}
-          className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-40"
+          variant="primary"
+          isDisabled={!sessions}
+          onPress={onExport}
         >
           Export CSV
-        </button>
-        <label className="cursor-pointer rounded-full bg-surface-bright px-4 py-2 text-sm font-bold text-on-surface">
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onPress={() => fileInputRef.current?.click()}
+        >
           Import CSV
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onFile(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onFile(f);
+            e.target.value = "";
+          }}
+        />
       </div>
       {report !== null && (
         <p className="mt-3 text-sm text-on-surface-variant">{report}</p>

@@ -22,6 +22,7 @@
  */
 
 import { useConvexAuth } from "@convex-dev/auth/react";
+import { Button } from "@heroui/react";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -352,14 +353,14 @@ function SettingsFields({
         <h2 className="text-sm font-bold uppercase tracking-widest text-on-surface">
           Settings
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={onClose}
           aria-label="Close settings"
-          className="rounded-lg px-2 py-1 text-xs font-bold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-high hover:text-on-surface"
         >
           Close
-        </button>
+        </Button>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
@@ -452,13 +453,15 @@ function SettingsFields({
         </p>
       )}
 
-      <button
+      <Button
         type="button"
-        onClick={save}
-        className="cta-gradient mt-5 w-full rounded-xl py-3 text-sm font-bold tracking-tight text-on-primary transition-all duration-150 ease-sanctuary active:scale-95"
+        variant="primary"
+        fullWidth
+        onPress={save}
+        className="mt-5"
       >
         {saved ? "Saved" : "Save changes"}
-      </button>
+      </Button>
       <p className="mt-3 text-center text-xs text-on-surface-variant">
         Durations apply to the next phase — the running one is never resized.
       </p>
@@ -473,24 +476,24 @@ export function SettingsDialog({ variant }: { variant?: "header" | "tab" }) {
   return (
     <>
       {variant === "tab" ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => setOpen(true)}
           aria-label="Open settings"
-          className="rounded-full px-3 py-1 text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:text-on-surface"
         >
           Settings
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
+        <Button
+          size="sm"
+          variant="secondary"
+          onPress={() => setOpen(true)}
           aria-label="Open settings"
-          className="flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1 font-mono text-xs font-bold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-highest hover:text-on-surface"
         >
           <GearIcon />
           Settings
-        </button>
+        </Button>
       )}
 
       {open && (

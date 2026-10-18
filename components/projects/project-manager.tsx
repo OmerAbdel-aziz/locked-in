@@ -104,6 +104,7 @@ export function ProjectManagerView({
           <Button
             type="button"
             variant="ghost"
+            size="sm"
             isDisabled={!ready}
             onPress={() => {
               // `type="button"` deliberately: a submit button would fire
@@ -116,7 +117,6 @@ export function ProjectManagerView({
                 setDraft("");
               }
             }}
-            className="mr-2 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-on-surface/70 transition-colors hover:bg-surface-container-high hover:text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Add
           </Button>
@@ -166,9 +166,8 @@ export function ProjectManagerView({
                   </TextField>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="primary"
                     onPress={() => commitRename(project.id)}
-                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-primary"
                   >
                     Save
                   </Button>
@@ -176,7 +175,6 @@ export function ProjectManagerView({
                     size="sm"
                     variant="ghost"
                     onPress={() => setEditingId(null)}
-                    className="shrink-0 rounded-lg px-2 py-1 text-xs text-on-surface-variant"
                   >
                     Cancel
                   </Button>
@@ -200,7 +198,6 @@ export function ProjectManagerView({
                         setEditingId(project.id);
                         setEditingName(project.name);
                       }}
-                      className="rounded-lg px-2 py-1 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
                     >
                       Rename
                     </Button>
@@ -210,7 +207,6 @@ export function ProjectManagerView({
                         variant="ghost"
                         aria-label={`Restore ${project.name}`}
                         onPress={() => onUnarchive(project.id)}
-                        className="rounded-lg px-2 py-1 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
                       >
                         Restore
                       </Button>
@@ -220,7 +216,6 @@ export function ProjectManagerView({
                         variant="ghost"
                         aria-label={`Archive ${project.name}`}
                         onPress={() => onArchive(project.id)}
-                        className="rounded-lg px-2 py-1 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
                       >
                         Archive
                       </Button>

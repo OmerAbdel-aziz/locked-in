@@ -30,6 +30,7 @@
  */
 
 import { useEffect } from "react";
+import { Button } from "@heroui/react";
 
 import type { Phase, TimerStatus } from "@/lib/pomodoro";
 import { useTimerStore } from "@/lib/store/timer";
@@ -97,18 +98,18 @@ export function ShroudToggle() {
   const active = shouldShroudActive(phase, status, shroudEnabled);
 
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant="secondary"
       aria-pressed={shroudEnabled}
       aria-label={shroudEnabled ? "Hide focus shroud" : "Show focus shroud"}
-      title={shroudEnabled ? "Hide focus shroud" : "Show focus shroud"}
-      onClick={() => setShroudEnabled(!shroudEnabled)}
+      onPress={() => setShroudEnabled(!shroudEnabled)}
       data-testid="shroud-toggle"
       data-active={active ? "true" : "false"}
-      className="mt-4 rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface-variant transition-colors duration-150 ease-sanctuary hover:bg-surface-container-high hover:text-on-surface"
+      className="mt-4"
     >
       {shroudEnabled ? "Shroud on" : "Shroud off"}
-    </button>
+    </Button>
   );
 }
 

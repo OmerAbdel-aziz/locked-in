@@ -33,7 +33,7 @@ import { useState, type KeyboardEvent } from "react";
 
 import type { DropPosition } from "@/lib/task-order";
 
-import { Checkbox, Input, Label, ListBox, Select, TextField } from "@heroui/react";
+import { Checkbox, Button, Input, Label, ListBox, Select, TextField } from "@heroui/react";
 
 import type { PickerProject } from "@/components/projects/picker";
 import { ProjectPicker } from "@/components/projects/picker";
@@ -157,9 +157,6 @@ export function TaskItem<Id extends string>({
       setEditing(false);
     }
   }
-
-  const iconButton =
-    "rounded p-1 text-on-surface-variant opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-60 hover:!opacity-100 hover:text-on-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40";
 
   return (
     <div
@@ -287,20 +284,20 @@ export function TaskItem<Id extends string>({
           )}
 
           <span className="ml-auto flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={commitEdit}
-              className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+            <Button
+              size="sm"
+              variant="primary"
+              onPress={commitEdit}
             >
               Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => setEditing(false)}
             >
               Cancel
-            </button>
+            </Button>
           </span>
         </div>
       ) : (
@@ -384,28 +381,33 @@ export function TaskItem<Id extends string>({
             {/* Edit + delete: same hover reveal as the handle. Deleting is
                 immediate, matching "Clear completed" — the sessions survive
                 unbound (ADR-003), so the destructive part is the label. */}
-            <button
-              type="button"
-              aria-label={`Edit ${row.title}`}
+            <span
               onClick={(event) => {
                 event.stopPropagation();
-                beginEdit();
               }}
-              className={iconButton}
+              className="flex shrink-0 items-center gap-1"
             >
-              <EditIcon className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              aria-label={`Delete ${row.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemove(row.id);
-              }}
-              className={iconButton}
-            >
-              <TrashIcon className="size-3.5" />
-            </button>
+              <Button
+                type="button"
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label={`Edit ${row.title}`}
+                onPress={() => beginEdit()}
+              >
+                <EditIcon className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label={`Delete ${row.title}`}
+                onPress={() => onRemove(row.id)}
+              >
+                <TrashIcon className="size-3.5" />
+              </Button>
+            </span>
             {row.done ? null : (
               <DragHandleIcon className="ml-0.5 size-3.5 text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-40" />
             )}

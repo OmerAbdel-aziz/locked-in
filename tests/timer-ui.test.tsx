@@ -259,10 +259,10 @@ describe("the primary CTA names the action the state actually offers", () => {
     expect(primaryLabel("focus", "paused")).toBe("Resume");
   });
 
-  it("uses the 145deg gradient, never a flat fill", () => {
+  it("renders the CTA as a standard solid HeroUI primary button", () => {
     render(<TimerEngine />);
     const cta = screen.getByRole("button", { name: "Start Focus Session" });
-    expect(cta.className).toContain("cta-gradient");
+    expect(cta.className).toContain("button--primary");
   });
 });
 
@@ -533,7 +533,7 @@ describe("DESIGN.md's binding rules hold in the rendered output", () => {
 });
 
 describe("the ghost controls", () => {
-  it("carry no background until hovered (DESIGN.md §5)", () => {
+  it("are standard HeroUI ghost buttons with no fill of their own", () => {
     render(<TimerControls
       phase="focus"
       status="idle"
@@ -550,9 +550,10 @@ describe("the ghost controls", () => {
         (cls) => cls.startsWith("bg-") && !cls.startsWith("hover:"),
       );
 
-      // Ghost means exactly this: no fill at rest, a tonal shift on hover.
+      // Ghost means HeroUI's own variant: no fill of ours at rest; the
+      // tonal hover comes from the library's button--ghost styles.
       expect(baseBackgrounds).toEqual([]);
-      expect(button.className).toContain("hover:bg-surface-container-high");
+      expect(button.className).toContain("button--ghost");
     }
   });
 });
