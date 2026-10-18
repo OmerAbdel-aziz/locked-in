@@ -8,6 +8,7 @@ import { SessionLogger } from "@/components/session-logger";
 import { PhaseNotice } from "@/components/settings/phase-notice";
 import { SettingsSync } from "@/components/settings/settings-sync";
 import { ThemeSync } from "@/components/theme-sync";
+import { TimerStateSync } from "@/components/timer/timer-state-sync";
 
 /**
  * Client-side Convex wiring — Task 4.
@@ -71,6 +72,10 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
           conditions the app starts with, and a completed session must find
           a writer no matter which route was showing. */}
       <SessionLogger />
+      {/* ADR-005: the in-flight timer's server mirror. Same root placement
+          as the session log's writer — a boundary crossed on any route must
+          reach the mirror, and a reload on any route must restore from it. */}
+      <TimerStateSync />
       {/* Task 16: server settings flow into the timer store from here, so a
           change in the dialog reaches the next phase transition on any
           route without a reload. Task 17's in-app phase-end toast likewise

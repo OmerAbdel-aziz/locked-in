@@ -91,6 +91,47 @@ export interface CompletedPhase {
 export type SessionLogger = (entry: CompletedPhase) => void;
 
 /**
+ * One boundary of the in-flight phase, shaped for the server mirror —
+ * ADR-005.
+ *
+ * This is `TimerState` flattened for the network: only the instants the
+ * countdown derives from, never remaining time and never an idle snapshot
+ * (idle is the *absence* of a row server-side). `boundTaskId` /
+ * `boundProjectId` are the D8 binding this phase began with — the same
+ * snapshot `CompletedPhase` carries, taken at start, immutable through
+ * pauses — so that `complete()` on a restored timer logs the row the
+ * original tab would have.
+ */
+export interface PersistedTimerState {
+  phase: Phase;
+  cyclePosition: number;
+  status: "running" | "paused";
+  /** Wall-clock ms when the running phase ends; always present. */
+  phaseEndsAt: number;
+  /** Pause-adjusted start of the logged session; always present. */
+  startedAt: number;
+  /** Present only while paused. */
+  pausedAt: number | null;
+  /** The D8 binding as it stood at this phase's start. */
+  taskId?: Id<"tasks">;
+  projectId?: Id<"projects">;
+}
+
+/**
+ * How the current boundary becomes the server mirror row.
+ *
+ * Injected exactly like `sessionLogger`: a plain module cannot reach a
+ * `useMutation`, and the store stays unit-testable without a Convex URL.
+ * `save` replaces the row on every boundary event; `clear` deletes it when
+ * the timer goes idle — the row's lifetime is the phase's, so a stale row
+ * can never resurrect a finished session in another tab.
+ */
+export interface TimerStatePersister {
+  save: (anchor: PersistedTimerState) => void;
+  clear: () => void;
+}
+
+/**
  * The in-app phase-end signal — Task 17.
  *
  * Set on *every* completion, whether or not a browser notification was
@@ -162,6 +203,34 @@ export interface TimerStore {
    */
   sessionLogger: SessionLogger | null;
   setSessionLogger: (logger: SessionLogger | null) => void;
+
+  /**
+   * Where the in-flight boundary is mirrored for refresh recovery (ADR-005).
+   * `null` until the app injects one and `null` in tests that don't care —
+   * transitions still happen, they simply leave nothing behind server-side.
+   */
+  timerStatePersister: TimerStatePersister | null;
+  setTimerStatePersister: (persister: TimerStatePersister | null) => void;
+
+  /**
+   * Restore a persisted timer at page load — ADR-005's read path.
+   *
+   * Runs once per load, straight after the mirror row arrives. It replaces
+   * `state` and `boundTask` wholesale rather than calling the engine,
+   * because this is not a transition but a *resumption* of one already
+   * taken: the engine's rules were honored live in the tab that ran it.
+   * The wall-clock countdown (`phaseEndsAt - now`) then does the rest — a
+   * phase that kept running shows its true remaining time immediately, and
+   * one that is already overdue completes on the next tick and logs itself
+   * at the instant it actually ended, exactly as if the tab had stayed
+   * open (complete's `completedAt = Math.min(phaseEndsAt, now)`).
+   *
+   * Guarded to idle: a user who beats the query to the Start button has
+   * built real state of their own, and a late mirror row must not
+   * overwrite it. Touches only `state` and `boundTask` — phase notice,
+   * settings and the selection belong to this tab, not the mirror.
+   */
+  hydrate: (state: TimerState, boundTask: ActiveTask | null) => void;
 
   start: () => void;
   pause: () => void;
@@ -238,14 +307,63 @@ export const useTimerStore = create<TimerStore>((set, get) => {
    * construction rather than by every action remembering it. `extra` exists
    * for the one caller that changes something alongside the state
    * (`setSettings`); the derived fields are written last and always win.
+   *
+   * The mirror write rides the same choke point (ADR-005): one place that
+   * sees every engine transition is the one place a boundary event can be
+   * persisted, and `hydrate` deliberately bypasses it (it uses `set`
+   * directly) so restoring cannot echo back to the server.
    */
   const transition = (next: TimerState, extra?: Partial<TimerStore>): void => {
     const { state: previous, activeTask, boundTask } = get();
+    const binding = nextBinding(previous, next, activeTask, boundTask);
     set({
       ...extra,
       state: next,
-      boundTask: nextBinding(previous, next, activeTask, boundTask),
+      boundTask: binding,
     });
+    persistBoundary(next, binding);
+  };
+
+  /**
+   * Mirror the boundary server-side, or drop the row when the timer went
+   * idle. Fire-and-forget, like the session log: an unreachable server
+   * downgrades refresh recovery (PRD §1's D9 is online-only), never the
+   * timer itself.
+   */
+  const persistBoundary = (
+    next: TimerState,
+    binding: ActiveTask | null,
+  ): void => {
+    const { timerStatePersister } = get();
+    if (timerStatePersister === null) {
+      return;
+    }
+    try {
+      if (next.startedAt === null || next.phaseEndsAt === null) {
+        // Idle — the waiting phase after a reset, a skipped phase with
+        // autostart off, a completion without autostart, a tab switch to a
+        // different phase while running. No row exists for any of these.
+        timerStatePersister.clear();
+        return;
+      }
+      timerStatePersister.save({
+        phase: next.phase,
+        cyclePosition: next.cyclePosition,
+        status: next.status === "paused" ? "paused" : "running",
+        phaseEndsAt: next.phaseEndsAt,
+        startedAt: next.startedAt,
+        pausedAt: next.pausedAt,
+        // Absent, not null, when the phase began with nothing selected —
+        // the same convention `logCompleted` receives from `complete`.
+        taskId: binding?.taskId,
+        projectId: binding?.projectId,
+      });
+    } catch (error) {
+      console.error(
+        "locked-in: could not mirror the timer boundary",
+        error,
+      );
+    }
   };
 
   return {
@@ -267,6 +385,24 @@ export const useTimerStore = create<TimerStore>((set, get) => {
 
     sessionLogger: null,
     setSessionLogger: (sessionLogger) => set({ sessionLogger }),
+
+    timerStatePersister: null,
+    setTimerStatePersister: (timerStatePersister) =>
+      set({ timerStatePersister }),
+
+    hydrate: (state, boundTask) => {
+      const { state: current } = get();
+      // Only an idle timer can be restored: a non-idle one means this tab
+      // beat the query (or a second tab already acted), and the mirror row
+      // is either stale or for a phase that someone else is running. Doing
+      // nothing there is also what makes hydration safe under Convex's
+      // reactive re-delivery — by the time it could fire twice the store is
+      // no longer idle and the second call is refused.
+      if (current.startedAt !== null) {
+        return;
+      }
+      set({ state, boundTask });
+    },
 
     setNotificationsEnabled: (notificationsEnabled) =>
       set({ notificationsEnabled }),

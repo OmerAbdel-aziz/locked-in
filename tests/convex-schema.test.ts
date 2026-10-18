@@ -89,6 +89,23 @@ const PRD_6: Record<string, Record<string, boolean>> = {
     autoStartFocus: true,
     notificationsEnabled: true,
   },
+  // ADR-005 (2026-10-18): the in-flight timer's server mirror — one row per
+  // owner, rewritten on boundary events, deleted on idle. Ephemeral by
+  // design and deliberately NOT part of PRD §6's canonical data model; it
+  // is recorded in this map only so the table-list check below keeps seeing
+  // every table and can never lose this one to drift either.
+  timerState: {
+    ownerId: true,
+    phase: true,
+    cyclePosition: true,
+    status: true,
+    phaseEndsAt: true,
+    startedAt: true,
+    pausedAt: false,
+    boundTaskId: false,
+    boundProjectId: false,
+    updatedAt: true,
+  },
 };
 
 /**

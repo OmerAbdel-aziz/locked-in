@@ -156,6 +156,48 @@ export default defineSchema({
     .index("by_owner_completed", ["ownerId", "completedAt"])
     .index("by_owner_task", ["ownerId", "taskId"]),
 
+  /**
+   * The single in-flight timer, mirrored for refresh recovery (ADR-005).
+   *
+   * Written by the client on **boundary events only** — start, pause, resume,
+   * skip, reset, completion, and any transition that moves the deadline or
+   * the cycle — never per tick. The countdown is never stored as remaining
+   * time; only the wall-clock instants `phaseEndsAt` / `startedAt` /
+   * `pausedAt` are, so a device that closed an hour ago re-derives the
+   * correct remaining time (or the fact the phase is overdue) from its own
+   * clock at hydrate time, byte-for-byte the same math the live face uses.
+   *
+   * Ephemeral and *rewritable*, deliberately unlike append-only `sessions`
+   * (ADR-003): a completed session is history and must never change, while
+   * this row is the timer's current position and every boundary replaces it.
+   * Idle is the **absence** of a row — `clear` deletes it on the way down,
+   * so stale rows can never resurrect a finished session in a second tab.
+   *
+   * One row per owner, enforced by read-then-write on the `by_owner` index
+   * (the writer is per-tab, and last-tab-writer-wins is the honest outcome
+   * of two devices trying to run the same phase at once).
+   */
+  timerState: defineTable({
+    ownerId: v.id("users"),
+    phase: v.union(v.literal("focus"), v.literal("short"), v.literal("long")),
+    /** "The focus session that will start next", 1..N — same rule as the engine's. */
+    cyclePosition: v.number(),
+    /** A row always describes running or paused — idle is no row at all. */
+    status: v.union(v.literal("running"), v.literal("paused")),
+    /** Wall-clock ms when the running phase ends (always present in a row). */
+    phaseEndsAt: v.number(),
+    /** Pause-adjusted start of the logged session (always present in a row). */
+    startedAt: v.number(),
+    /** Present only while `paused`; removed on the way back to running. */
+    pausedAt: v.optional(v.number()),
+    /** The D8 binding of this phase, as it stood at phase start. */
+    boundTaskId: v.optional(v.id("tasks")),
+    /** The same instant's project snapshot (PRD §6 semantics, same as `sessions`). */
+    boundProjectId: v.optional(v.id("projects")),
+    /** Client clock at the last boundary — diagnostic, never authoritative. */
+    updatedAt: v.number(),
+  }).index("by_owner", ["ownerId"]),
+
   /** One row per owner, written lazily on first use. */
   settings: defineTable({
     ownerId: v.id("users"),

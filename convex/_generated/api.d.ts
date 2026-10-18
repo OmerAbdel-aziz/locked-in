@@ -19,6 +19,7 @@ import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
 import type * as stats from "../stats.js";
 import type * as tasks from "../tasks.js";
+import type * as timer_state from "../timer_state.js";
 
 import type {
   ApiFromModules,
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   stats: typeof stats;
   tasks: typeof tasks;
+  timer_state: typeof timer_state;
 }>;
 
 /**

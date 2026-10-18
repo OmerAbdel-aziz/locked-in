@@ -35,7 +35,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 | D6c | Typeface | **JetBrains Mono for everything** (revised 2026-10-16). This **supersedes the mono/Inter pairing** in `docs/design/typography.md`: there is no Inter anywhere. JetBrains Mono is already self-hosted via `next/font`; pointing `--font-sans`/`--font-mono` at it — which the three themes' own `--font-sans` tokens expect — also retints HeroUI's components to mono |
 | D7 | Sign-in data merge | **Ask on sign-in** ("keep device data?"), merge is the default button; plus **CSV session import** |
 | D8 | Session ↔ task binding | Session assigned to `activeTaskId` **at start**, immutable thereafter; estimate = leaf count (default 2, range 0–8) |
-| D9 | Offline | **Online-only.** No outbox, no local persistence layer. Timer is client state; mutations require connectivity |
+| D9 | Offline | **Online-only.** No outbox, no local persistence layer. Timer is client state; mutations require connectivity. **Revised 2026-10-18 (ADR-005):** the in-flight timer's *boundary instants* (`phaseEndsAt`/`startedAt`/`pausedAt` + D8 binding) are mirrored to Convex on control events (start/pause/resume/skip/reset/complete), so a reload restores the session; ticks are still never persisted and the engine stays client-side |
 
 ## 3. Assumptions
 
@@ -210,7 +210,7 @@ npx convex deploy  # deploy backend
 
 - **Always:** DESIGN.md rules are binding; streak/counts derived from session log; timer never depends on network round-trips; tests before commits.
 - **Ask first:** Convex schema changes; adding a dependency; anything that touches merge semantics; changing timer transition defaults.
-- **Never:** store secrets in the repo; persist timer ticks to Convex (write session boundaries only); build offline/queueing layers; introduce 1px divider borders.
+- **Never:** store secrets in the repo; persist timer ticks to Convex (write session **boundaries only** — the D9 control events per ADR-005, never per-tick time); build offline/queueing layers; introduce 1px divider borders.
 
 ## 10. Success criteria
 
