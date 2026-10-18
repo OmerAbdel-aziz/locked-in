@@ -489,9 +489,9 @@ describe("DESIGN.md's binding rules hold in the rendered output", () => {
     const { container } = render(<Page />);
 
     // A directional border at Tailwind's *default* width is the 1px divider
-    // §5 forbids; `divide-*` is the same thing one abstraction up. Explicit
-    // widths are affordances the design itself draws — the tab underline
-    // (`border-b-2`) and the active-task rail (`border-l-2`).
+    // §5 forbids; `divide-*` is the same thing one abstraction up. The mode
+    // switch and the active-task marker both read by tone now, so no
+    // directional border of any width is sanctioned here.
     const onePixelLines = allClasses(container).filter(
       (cls) =>
         /^border(-(t|r|b|l|x|y))$/.test(cls) || /^divide-/.test(cls),

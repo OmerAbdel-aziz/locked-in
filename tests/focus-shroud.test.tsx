@@ -8,6 +8,7 @@ import {
   SHROUD_BASE_CLASS,
   ShroudToggle,
   shouldShroudActive,
+  shouldShowShroudToggle,
 } from "@/components/shroud/focus-shroud";
 import { TimerEngine } from "@/components/timer/timer-engine";
 import { DEFAULT_SETTINGS, initialTimerState } from "@/lib/pomodoro";
@@ -74,6 +75,16 @@ describe("shouldShroudActive — the visibility rule", () => {
     expect(shouldShroudActive("short", "running", true)).toBe(false);
     expect(shouldShroudActive("long", "running", true)).toBe(false);
     expect(shouldShroudActive("focus", "running", false)).toBe(false);
+  });
+});
+
+describe("shouldShowShroudToggle — the control's visibility rule", () => {
+  it("appears exactly while a focus session runs — veil state is irrelevant", () => {
+    expect(shouldShowShroudToggle("focus", "running")).toBe(true);
+    expect(shouldShowShroudToggle("focus", "paused")).toBe(false);
+    expect(shouldShowShroudToggle("focus", "idle")).toBe(false);
+    expect(shouldShowShroudToggle("short", "running")).toBe(false);
+    expect(shouldShowShroudToggle("long", "running")).toBe(false);
   });
 });
 
@@ -199,32 +210,60 @@ describe("timer + active task stay above the veil", () => {
 });
 
 describe("the toggle", () => {
-  it("is keyboard-accessible, pressed by default, and hides the veil", () => {
+  it("mounts only while a focus session runs, hides the veil when pressed, and stays usable after dismissal", () => {
     render(
       <>
         <FocusShroud />
         <ShroudToggle />
       </>,
     );
-    const toggle = screen.getByTestId("shroud-toggle");
-    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    // Idle: nothing to shroud, so the control is absent.
+    expect(screen.queryByTestId("shroud-toggle")).toBeNull();
 
     act(() => useTimerStore.getState().start());
     expect(screen.getByTestId("focus-shroud").getAttribute("data-active")).toBe(
       "true",
     );
+    const toggle = screen.getByTestId("shroud-toggle");
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId("focus-shroud").getAttribute("data-active")).toBe(
       "false",
     );
-    // The timer keeps running — the toggle never touches the phase.
+    // Dismissal is display-only: the control stays armed for a re-enable and
+    // the timer keeps running.
+    expect(screen.getByTestId("shroud-toggle")).toBeTruthy();
     expect(useTimerStore.getState().state.status).toBe("running");
   });
 
-  it("is mounted on the focus page", () => {
+  it("unmounts on pause and stays gone for breaks and idle", () => {
+    render(
+      <>
+        <FocusShroud />
+        <ShroudToggle />
+      </>,
+    );
+
+    act(() => useTimerStore.getState().start());
+    expect(screen.getByTestId("shroud-toggle")).toBeTruthy();
+
+    act(() => useTimerStore.getState().pause());
+    expect(screen.queryByTestId("shroud-toggle")).toBeNull();
+
+    act(() => useTimerStore.getState().resume());
+    expect(screen.getByTestId("shroud-toggle")).toBeTruthy();
+
+    act(() => useTimerStore.getState().skip());
+    expect(screen.queryByTestId("shroud-toggle")).toBeNull();
+  });
+
+  it("mounts on the focus page only while a focus session runs", () => {
     render(<Page />);
+    expect(screen.queryByTestId("shroud-toggle")).toBeNull();
+
+    act(() => useTimerStore.getState().start());
     expect(screen.getByTestId("shroud-toggle")).toBeTruthy();
     expect(screen.getByTestId("focus-shroud")).toBeTruthy();
   });

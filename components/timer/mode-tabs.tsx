@@ -1,18 +1,20 @@
 /**
- * Focus / Short Break / Long Break selector — Task 7, rewritten onto
- * HeroUI in Phase 3.5c, relocated above the ring in the Phase 9 polish.
+ * Focus / Short Break / Long Break selector — Task 7, relocated above the
+ * ring in the Phase 9 polish, re-drawn as hand-rolled pills.
  *
  * These look like navigation but behave as a mode switch: selecting one
  * repositions the engine through `setPhase` — it is neither a completion
  * nor a skip, so it never advances the cycle. It lives with the timer it
  * drives (centered above the ring) rather than in the header.
  *
- * HeroUI mapping (PRD D6a): Tabs, secondary variant — its underline
- * indicator is the active underline the design itself draws. That affordance
- * is a control state, not a section divider, so it does not touch DESIGN.md's
- * no-line rule. Grill ruling (Phase 9): the underline stays — the Focus/Stats
- * pill is a *route* switcher, this is a *state* switch, and the two jobs stay
- * visually distinct.
+ * Pills, not tabs: HeroUI `Tabs`' underline indicator is a thin rule (the
+ * one marker this design does not draw), and its indicator geometry breaks
+ * with the longer labels ("Short Break") at compact type sizes. The switch
+ * therefore uses the segmented-language the rest of the app already draws —
+ * a pill track (`bg-surface-container p-1`) with the selected option taking
+ * the strongest tonal step (`bg-surface-container-highest`), never a line.
+ * Tab semantics (role=tablist / role=tab + aria-selected) stay, and the
+ * segments are native buttons, so keyboard focus and Enter/Space work.
  *
  * Disabled while the timer runs: `selectPhase` abandons whatever is running
  * with no session logged (lib/pomodoro.ts), so a tap mid-run — now directly
@@ -21,8 +23,6 @@
  */
 
 "use client";
-
-import { Tabs } from "@heroui/react";
 
 import { PHASES, type Phase } from "@/lib/pomodoro";
 import { useTimerStore } from "@/lib/store/timer";
@@ -40,32 +40,39 @@ export function ModeTabs() {
 
   return (
     <div className="mb-6 flex w-full justify-center">
-      <Tabs
-        variant="secondary"
-        selectedKey={phase}
-        isDisabled={status === "running"}
-        onSelectionChange={(key) => setPhase(key as Phase)}
+      <div
+        role="tablist"
+        aria-label="Timer mode"
+        className="flex items-center gap-1 rounded-full bg-surface-container p-1"
       >
-        <Tabs.ListContainer>
-          <Tabs.List aria-label="Timer mode">
-            {PHASES.map((candidate) => (
-              // HeroUI's default tab is h-8 px-4 text-sm, which at these
-              // longer labels ("Short Break", "Long Break") sits so low it
-              // collides with the secondary variant's underline indicator
-              // when selected (Phase 9 polish). Compact: smaller type and
-              // tighter padding so the label clears the active line.
-              <Tabs.Tab
-                key={candidate}
-                id={candidate}
-                className="h-7 px-2.5 text-xs"
-              >
-                {PHASE_LABEL[candidate]}
-                <Tabs.Indicator />
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-        </Tabs.ListContainer>
-      </Tabs>
+        {PHASES.map((candidate) => {
+          const selected = phase === candidate;
+          return (
+            <button
+              key={candidate}
+              id={candidate}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-disabled={status === "running" ? true : undefined}
+              // `aria-disabled` guards semantics; the guarded branch guards
+              // behaviour — a click on a disabled tab abandons nothing.
+              onClick={() => {
+                if (status !== "running") {
+                  setPhase(candidate);
+                }
+              }}
+              className={`rounded-full px-4 py-1 text-xs font-semibold tracking-tight transition-colors duration-150 ${
+                selected
+                  ? "bg-surface-container-highest text-on-surface"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }${status === "running" ? " cursor-not-allowed opacity-50" : ""}`}
+            >
+              {PHASE_LABEL[candidate]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -19,6 +19,10 @@ import {
   requireOwnedTask,
   resolveOwner,
 } from "./lib/owner";
+import { perProjectBreakdown } from "../lib/aggregations";
+
+/** Upper bound for the bento donut's project-name reads (ADR-006). */
+const PROJECTS_CAP = 500;
 
 /** PRD §4.2 lets a title be edited inline; this bounds a single row. */
 const MAX_TITLE_LENGTH = 200;
@@ -719,10 +723,26 @@ export const todaySummary = query({
       estimatedLeaves += task.estimate;
     }
 
+    // The bento's donut (ADR-006): the same today scan split by project.
+    // Names resolve through the projects table (bounded, name-only reads);
+    // the derivation itself stays in the dependency-free aggregations.
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(PROJECTS_CAP);
+
     return {
       focusMinutes: focusMs / MS_PER_MINUTE,
       completedLeaves: focus.length,
       estimatedLeaves,
+      perProject: perProjectBreakdown(
+        focus,
+        projects.map((project) => ({
+          _id: project._id,
+          name: project.name,
+          archivedAt: project.archivedAt,
+        })),
+      ),
     };
   },
 });

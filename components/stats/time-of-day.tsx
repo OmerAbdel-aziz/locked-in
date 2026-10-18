@@ -1,14 +1,20 @@
+"use client";
+
 /**
- * Time-of-day distribution — Task 21, PRD §4.1 "which hours of the day the
- * user focuses most (derived from `startedAt`, no timezone guessing — use
- * recorded offsets)".
+ * Time-of-day distribution - Arc's BarChart over the 24 hour buckets
+ * (ADR-006). Sessions land in the hour each one *started* in, converted
+ * with its own recorded offset (never the runtime's) - the bucketing is
+ * still `timeOfDayHistogram` in `lib/aggregations.ts`, untouched.
  *
- * A 24-bar histogram over the local hour each focus session *started* in,
- * converted with that session's recorded offset (the bucketing itself lives
- * in `timeOfDayHistogram`, tested against cross-timezone fixtures). The peak
- * hour renders full-strength; every other hour renders the same hue at low
- * opacity — emphasis without a leaderboard. Pure view, no hooks.
+ * The peak-hour readout above the chart survives verbatim: it is the
+ * card's own answer, not a decoration. Axis labels thin to every third
+ * hour (Arc counts back from the latest slot, so the newest hour always
+ * has a label).
  */
+
+import { BarChart } from "@/components/arc/bar-chart/bar-chart";
+
+const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 export function TimeOfDayView({ hours }: { hours: number[] }) {
   const peak = Math.max(0, ...hours);
@@ -31,47 +37,22 @@ export function TimeOfDayView({ hours }: { hours: number[] }) {
           </>
         )}
       </p>
-      <svg
-        viewBox="0 0 240 76"
-        className="w-full"
-        role="img"
-        aria-label={
-          peak === 0
-            ? "No focus sessions in this range"
-            : `Most focus starts at ${String(peakHour).padStart(2, "0")}:00`
-        }
-      >
-        {hours.map((count, hour) => {
-          const height = peak === 0 ? 0 : (count / peak) * 56;
-          return (
-            <g key={hour}>
-              <title>{`${String(hour).padStart(2, "0")}:00 — ${count} sessions`}</title>
-              <rect
-                x={hour * 10 + 2}
-                y={58 - height}
-                width={6}
-                height={Math.max(height, 0)}
-                rx={2}
-                style={{ fill: "var(--chart-3)" }}
-                opacity={peak !== 0 && hour === peakHour ? 1 : 0.3}
-                data-hour={hour}
-                data-bar-height={Math.round(height * 100) / 100}
-              />
-              {hour % 6 === 0 && (
-                <text
-                  x={hour * 10 + 5}
-                  y={72}
-                  textAnchor="middle"
-                  fontSize="8"
-                  style={{ fill: "var(--muted)" }}
-                >
-                  {String(hour).padStart(2, "0")}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+      <BarChart
+        data={hours.map((count, hour) => ({
+          key: String(hour),
+          label: `${String(hour).padStart(2, "0")}:00`,
+          axisLabel: hour % 3 === 0 ? String(hour).padStart(2, "0") : undefined,
+          value: count,
+        }))}
+        label="Focus sessions by hour of day"
+        period="24h"
+        unit="sessions"
+        height={130}
+        showAverage={peak > 0}
+        averageLabel="Per-hour average"
+        valueLabel="Sessions"
+        formatValue={grouped.format}
+      />
     </div>
   );
 }

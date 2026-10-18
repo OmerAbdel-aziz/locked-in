@@ -10,10 +10,10 @@
  * strikethrough, and no handle — finished rows are not somewhere you drag,
  * which is also what Task 9's open/completed boundary rule expects).
  *
- * The green left border is the design's active-task marker — `code.html`
- * draws exactly `border-l-2 border-primary` on the row and nothing else —
- * and it renders from `row.isActive`, which the panel sets from the owner's
- * `activeTaskId` (Task 11).
+ * The active task reads by tone, from `row.isActive` (the panel sets it from
+ * the owner's `activeTaskId`, Task 11): the row lifts to the strongest
+ * surface step — the same selected-state language the segmented controls
+ * use. No colored edge rail: selection is a tonal fill, never a line.
  *
  * Clicking a row selects it (PRD §4.1), except on the checkbox: completing
  * a task and selecting it are two different decisions, and one control doing
@@ -120,7 +120,9 @@ export function TaskItem<Id extends string>({
 
   const shell = row.done
     ? "bg-surface-container-lowest opacity-40"
-    : "bg-surface-container-low/50 hover:bg-surface-container-low";
+    : row.isActive
+      ? "bg-surface-container-highest"
+      : "bg-surface-container-low/50 hover:bg-surface-container-low";
 
   const checkbox = row.done
     ? "bg-primary text-on-primary"
@@ -219,8 +221,8 @@ export function TaskItem<Id extends string>({
       }}
       onDragEnd={onDragEnd}
       className={`group flex cursor-grab items-center justify-between gap-2 rounded-xl p-4 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 active:cursor-grabbing ${shell}${
-        row.isActive ? " border-l-2 border-primary" : ""
-      }${dragging ? " opacity-40" : ""}${editing ? " cursor-default" : ""}`}
+        dragging ? " opacity-40" : ""
+      }${editing ? " cursor-default" : ""}`}
     >
       {editing ? (
         // The edit form: the add pill's three fields, minus the icon and the

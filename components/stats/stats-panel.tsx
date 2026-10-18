@@ -1,23 +1,29 @@
 "use client";
 
 /**
- * The mounted `/stats` panel — Tasks 20–22.
+ * The mounted `/stats` panel - Tasks 20-22, re-rendered over Arc UI
+ * (ADR-006).
  *
- * Owns the range state (preset + custom dates), converts it to a UTC window
- * with the device offset, and issues the two bounded queries from
- * `convex/stats.ts`. Everything rendered below is a pure view over the
- * answers, so the page settles into the same calm empty state a new account
- * sees whenever the range holds no sessions.
+ * State and data feeding are unchanged: the range (preset + custom dates)
+ * converts to a UTC window with the device offset and drives the two
+ * bounded queries from `convex/stats.ts` - plus a third, fixed trailing
+ * year for the heatmap (a second bounded scan of the same index; the
+ * heatmap deliberately ignores the range selector).
  *
- * Two clock rules, both inherited:
+ * Everything rendered is still a pure view over the answers, and every
+ * view is now Arc content in the app's tonal shells - charts (scrub-to-
+ * read bars, the per-project donut, the year heatmap, the period
+ * sparkline), counters, the sortable top-tasks table, the timeline, and
+ * the empty state.
+ *
+ * Clock rules, both inherited:
  *   - `now` arrives via the shared `useNow` hook (`lib/use-now.ts`):
- *     `useSyncExternalStore` with a minute-quantised snapshot (server `0`),
- *     because Next 16's `blocking-prerender-current-time` rejects clock
- *     reads during client render — the same rule that shaped `useCountdown`
- *     (Task 7) and `useTzOffsetMinutes` (Task 12). The quantisation is
- *     load-bearing: an unquantised snapshot re-renders forever.
+ *     `useSyncExternalStore` with a minute-quantised snapshot (server
+ *     `0`), because Next 16's `blocking-prerender-current-time` rejects
+ *     clock reads during client render. The quantisation is load-bearing:
+ *     an unquantised snapshot re-renders forever.
  *   - The auth gate mirrors `task-panel.tsx`: `useConvexAuth` from
- *     `@convex-dev/auth/react` (not `convex/react`), and Convex's `"skip"`
+ *     `@convex-dev/auth/react` (not `convex/react`), and Convex's "skip"
  *     literal until the anonymous session exists.
  */
 
@@ -36,14 +42,20 @@ import {
 import { useNow } from "@/lib/use-now";
 import { useTzOffsetMinutes } from "@/lib/use-tz-offset";
 
-import { PerProjectView, TopTasksView } from "./breakdown";
 import { EmptyStateView } from "./empty-state";
 import { FocusChartView } from "./focus-chart";
+import { FocusHeatmapView } from "./focus-heatmap";
+import { HeadlinesView } from "./headlines";
+import { ProjectDonutView } from "./project-donut";
 import { RangeSelectorView } from "./range-selector";
 import { SessionHistoryView } from "./session-history";
 import { SessionsChartView } from "./sessions-chart";
 import { TimeOfDayView } from "./time-of-day";
+import { TopTasksView } from "./top-tasks-table";
 import { TrendsView } from "./trends";
+
+/** The heatmap's window: the trailing 365 local days, always. */
+const HEATMAP_DAYS = 365;
 
 export function StatsPanel() {
   const { isAuthenticated } = useConvexAuth();
@@ -54,7 +66,7 @@ export function StatsPanel() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
-  // Untouched custom inputs default to the last 7 local days — derived from
+  // Untouched custom inputs default to the last 7 local days - derived from
   // the store snapshot, never read fresh from the clock during render.
   const defaultStart =
     now === 0 ? "" : localDateStr(now - 6 * MS_PER_DAY, tzOffsetMinutes);
@@ -93,16 +105,45 @@ export function StatsPanel() {
     ready ? { start: range.start, end: range.end, limit: 100 } : "skip",
   );
 
+  // The heatmap's own query - a fixed trailing year, settled separately so
+  // it can render even while the main range is empty.
+  const heatmapWindow = useMemo(() => {
+    if (now === 0 || !isAuthenticated) {
+      return null;
+    }
+    try {
+      const end = customDayStart(localDateStr(now, tzOffsetMinutes), tzOffsetMinutes) + MS_PER_DAY;
+      return { start: end - HEATMAP_DAYS * MS_PER_DAY, end };
+    } catch {
+      return null;
+    }
+  }, [now, isAuthenticated, tzOffsetMinutes]);
+  const heatmapStats = useQuery(
+    api.stats.rangeStats,
+    heatmapWindow
+      ? { ...heatmapWindow, tzOffsetMinutes }
+      : "skip",
+  );
+
   const settled = stats !== undefined && history !== undefined;
   const isEmpty =
     settled &&
     stats.totals.focusSessions === 0 &&
     stats.totals.breakSessions === 0;
 
-  const completion =
-    stats === undefined || stats.completion.ratio === null
-      ? "—"
-      : `${Math.round(stats.completion.ratio * 100)}%`;
+  // The heatmap is the analysis page's calendar picker: clicking a day
+  // switches to that day's custom range; the ring mirrors the custom day.
+  const pickDay = (dayKey: string) => {
+    setPreset("custom");
+    setCustomStart(dayKey);
+    setCustomEnd(dayKey);
+  };
+  const selectedDay =
+    preset === "custom" &&
+    customStart !== "" &&
+    customStart === (customEnd || defaultEnd)
+      ? customStart
+      : null;
 
   return (
     <div className="space-y-8">
@@ -117,73 +158,48 @@ export function StatsPanel() {
 
       {!settled || range === null ? (
         <EmptyStateView />
-      ) : isEmpty ? (
-        <EmptyStateView />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className="rounded-2xl bg-surface-container-low/30 p-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Focus time
-              </p>
-              <p className="font-mono text-2xl font-bold tracking-tight text-on-surface">
-                {(stats.totals.focusMs / 3_600_000).toFixed(1)}
-                <span className="ml-1 text-sm font-normal text-on-surface-variant">
-                  hrs
-                </span>
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface-container-low/30 p-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Sessions
-              </p>
-              <p className="font-mono text-2xl font-bold tracking-tight text-on-surface">
-                {stats.totals.focusSessions}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface-container-low/30 p-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Break time
-              </p>
-              <p className="font-mono text-2xl font-bold tracking-tight text-on-surface">
-                {(stats.totals.breakMs / 3_600_000).toFixed(1)}
-                <span className="ml-1 text-sm font-normal text-on-surface-variant">
-                  hrs
-                </span>
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface-container-low/30 p-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Completion
-              </p>
-              {/* Passive readout at every value — the bento's rule (Task 12). */}
-              <p className="text-2xl font-bold tracking-tight text-primary">
-                {completion}
-              </p>
-            </div>
-          </div>
+          <HeadlinesView stats={stats} days={stats.perDay} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <FocusChartView days={stats.perDay} />
-            <SessionsChartView days={stats.perDay} />
-          </div>
+          {heatmapStats !== undefined && heatmapStats !== null && (
+            <FocusHeatmapView
+              days={heatmapStats.perDay.map((day) => ({
+                date: day.dayKey,
+                count: Math.round(day.focusMs / 60_000),
+              }))}
+              selectedDate={selectedDay}
+              onPickDay={pickDay}
+            />
+          )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <TrendsView deltas={stats.deltas} />
-            <TimeOfDayView hours={stats.timeOfDay} />
-          </div>
+          {!isEmpty ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <FocusChartView days={stats.perDay} />
+                <SessionsChartView days={stats.perDay} />
+              </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <PerProjectView slices={stats.perProject} />
-            <TopTasksView slices={stats.topTasks} />
-          </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TrendsView deltas={stats.deltas} days={stats.perDay} />
+                <TimeOfDayView hours={stats.timeOfDay} />
+              </div>
 
-          <div>
-            <h2 className="mb-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              History
-            </h2>
-            <SessionHistoryView rows={history.sessions} />
-          </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <ProjectDonutView slices={stats.perProject} />
+                <TopTasksView slices={stats.topTasks} />
+              </div>
+
+              <div>
+                <h2 className="mb-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  History
+                </h2>
+                <SessionHistoryView rows={history.sessions} now={now === 0 ? 0 : now} />
+              </div>
+            </>
+          ) : (
+            <EmptyStateView />
+          )}
         </>
       )}
     </div>

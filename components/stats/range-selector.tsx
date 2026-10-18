@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * Range selector — Task 20, PRD §4.1 "Range selector: Today / 7 days /
- * 30 days / custom".
+ * Range selector - Arc's SegmentedControl for the four presets (ADR-006),
+ * the custom `<input type="date">` pair unchanged.
  *
- * Pure view over a preset + two `YYYY-MM-DD` strings; the UTC-window math
- * lives in `lib/aggregations.ts` (`presetRange`, `customDayStart`) so the
- * selector itself owns no dates. The custom date inputs are plain
- * `<input type="date">` — the one native control whose affordance needs no
- * invention — naming *local* days, which the panel converts with the
- * device offset.
+ * The native date inputs stay the one deliberate non-Arc control here:
+ * they name *local* days, the panel converts them with the device offset
+ * (`customDayStart`), and Arc's pickers would reformat calendar days by
+ * the runtime's zone - the same reason the timer page keeps native
+ * inputs for anything timezone-shaped.
  */
 
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import type { RangePreset } from "@/lib/aggregations";
 
 const PRESETS: { value: RangePreset; label: string }[] = [
@@ -36,31 +36,14 @@ export function RangeSelectorView({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div
-        className="flex items-center gap-1 rounded-full bg-surface-container-low/60 p-1"
-        role="tablist"
-        aria-label="Stats range"
-      >
-        {PRESETS.map((preset) => {
-          const selected = value.preset === preset.value;
-          return (
-            <button
-              key={preset.value}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => onChange({ ...value, preset: preset.value })}
-              className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition-colors duration-500 ease-sanctuary ${
-                selected
-                  ? "bg-surface-container-highest text-on-surface"
-                  : "text-on-surface-variant"
-              }`}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedControl
+        options={PRESETS}
+        value={value.preset}
+        onValueChange={(preset) =>
+          onChange({ ...value, preset: preset as RangePreset })
+        }
+        label="Stats range"
+      />
 
       {value.preset === "custom" && (
         <div className="flex items-center gap-2 text-xs text-on-surface-variant">

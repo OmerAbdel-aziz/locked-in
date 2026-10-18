@@ -695,15 +695,16 @@ describe("the row's design details", () => {
     expect(rowFor("Draft the outline").className).not.toContain("opacity-40");
   });
 
-  it("marks the active row with the design's green rail", () => {
+  it("marks the active row with the strongest tonal step, no colored rail", () => {
     renderList(TASKS);
 
     expect(rowFor("Draft the outline").className).toContain(
-      "border-l-2 border-primary",
+      "bg-surface-container-highest",
     );
     expect(rowFor("Review pull requests").className).not.toContain(
-      "border-l-2",
+      "bg-surface-container-highest",
     );
+    expect(rowFor("Review pull requests").className).not.toContain("border-l");
   });
 
   it("renders a project tag inline when a task has a project", () => {

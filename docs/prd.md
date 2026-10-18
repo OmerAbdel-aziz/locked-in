@@ -3,7 +3,7 @@
 **Status:** Draft (pending human review)
 **Date:** 2026-10-14
 **Source material:** Stitch design package (`DESIGN.md`, `screen.png`, `code.html`) — frozen in [`docs/design/`](design/README.md)
-**Related:** [ADR-001](decisions/ADR-001-nextjs-convex-stack.md), [ADR-002](decisions/ADR-002-anonymous-first-auth.md), [ADR-003](decisions/ADR-003-session-log-canonical.md), [ADR-004](decisions/ADR-004-two-column-dashboard-layout.md)
+**Related:** [ADR-001](decisions/ADR-001-nextjs-convex-stack.md), [ADR-002](decisions/ADR-002-anonymous-first-auth.md), [ADR-003](decisions/ADR-003-session-log-canonical.md), [ADR-004](decisions/ADR-004-two-column-dashboard-layout.md), [ADR-005](decisions/ADR-005-server-mirror-in-flight-timer.md), [ADR-006](decisions/ADR-006-arc-ui-on-stats-and-today-donut.md)
 
 ---
 
@@ -36,6 +36,7 @@ Locked In is a personal pomodoro focus app that feels like "a high-end, quiet li
 | D7 | Sign-in data merge | **Ask on sign-in** ("keep device data?"), merge is the default button; plus **CSV session import** |
 | D8 | Session ↔ task binding | Session assigned to `activeTaskId` **at start**, immutable thereafter; estimate = leaf count (default 2, range 0–8) |
 | D9 | Offline | **Online-only.** No outbox, no local persistence layer. Timer is client state; mutations require connectivity. **Revised 2026-10-18 (ADR-005):** the in-flight timer's *boundary instants* (`phaseEndsAt`/`startedAt`/`pausedAt` + D8 binding) are mirrored to Convex on control events (start/pause/resume/skip/reset/complete), so a reload restores the session; ticks are still never persisted and the engine stays client-side |
+| D10 | Stats charting | **Arc UI components** on the analysis surfaces (revised 2026-10-18, closes OQ5, see [ADR-006](decisions/ADR-006-arc-ui-on-stats-and-today-donut.md)). The earlier "lean hand-rolled SVG" lean is reversed: every chart, counter, list and empty state on `/stats` — plus the home bento's today per-project donut — is rebuilt on Arc (`bar-chart`, `donut-chart`, `activity-heatmap`, `animated-counter`, `sparkline`, `segmented-control`, `sortable-data-table`, `timeline`, `empty-state`), themed through a CSS token bridge in `globals.css` (Arc source never edited), with Arc motion on stats only and the timezone rules (D5, ADR-003) preserved by pre-shifted history + `timeZone="UTC"`. HeroUI stays the app's chrome (D6a); native `<input type="date">` stays for custom ranges (runtime-zone reformatting) |
 
 ## 3. Assumptions
 
@@ -231,7 +232,7 @@ npx convex deploy  # deploy backend
 2. Notification support/sound on mobile browsers — likely degrade gracefully, confirm scope for v1.1.
 3. Magic-link delivery limits for anonymous users who later "lose" the device — document recovery expectations.
 4. Drag-reorder persistence ordering scheme (fractional index vs. integer ranks) — decide at schema time.
-5. **Stats charting library** — hand-rolled SVG (full design control, DESIGN.md-compatible) vs. Recharts/Nivo (faster, heavier, fights the no-line aesthetic). Lean hand-rolled SVG for the chart types we need.
+5. ~~**Stats charting library**~~ **Resolved 2026-10-18 (ADR-006 / D10): Arc UI components** on the analysis surfaces — not hand-rolled SVG and not Recharts/Nivo. The original lean assumed the choice was "our SVG vs heavy canvas libs"; Arc's tonal, no-border aesthetic plus its scrub-to-read/aria surfaces beat both, with a CSS-bridge theming layer that keeps the D6b tokens in control.
 
 ## 12. Risks
 

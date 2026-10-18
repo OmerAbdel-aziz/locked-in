@@ -84,11 +84,20 @@ export function FocusShroud() {
 }
 
 /**
- * The toggle control — rendered beside the timer (see `app/page.tsx`), always
- * keyboard-focusable as a native button with `aria-pressed`. Turning it off
- * while a focus session runs hides the veil immediately; turning it on during
- * a run shows it. It never touches the timer itself.
+ * The toggle control — rendered beside the timer (see `app/page.tsx`) only
+ * while a focus session is running: that is the only state in which it has a
+ * job (the veil is up and can be hidden, or was hidden by Escape and can be
+ * re-armed). Outside a run it renders nothing. Keyboard-focusable native
+ * button with `aria-pressed`. Turning it off hides the veil immediately;
+ * turning it on shows it. It never touches the timer itself.
  */
+export function shouldShowShroudToggle(
+  phase: Phase,
+  status: TimerStatus,
+): boolean {
+  return phase === "focus" && status === "running";
+}
+
 export function ShroudToggle() {
   const shroudEnabled = useTimerStore((s) => s.shroudEnabled);
   const setShroudEnabled = useTimerStore((s) => s.setShroudEnabled);
@@ -96,6 +105,11 @@ export function ShroudToggle() {
   const status = useTimerStore((s) => s.state.status);
 
   const active = shouldShroudActive(phase, status, shroudEnabled);
+
+  // Nothing to shroud and nothing to reveal: gone until a focus run begins.
+  if (!shouldShowShroudToggle(phase, status)) {
+    return null;
+  }
 
   return (
     <Button

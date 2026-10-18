@@ -11,6 +11,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // jsdom lacks the observer/matchMedia APIs motion and Arc components rely on.
+    setupFiles: ["tests/setup.ts"],
     // Everything under tests/ is a unit or integration test.
     // E2E lives in e2e/ and runs under Playwright, not vitest.
     include: ["tests/**/*.{test,spec}.{ts,tsx}"],

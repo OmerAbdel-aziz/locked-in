@@ -21,18 +21,18 @@ test.describe("stats surface", () => {
   test("range selector switches presets and reveals custom dates", async ({
     page,
   }) => {
-    const tabs = page.getByRole("tablist", { name: "Stats range" });
-    await expect(tabs).toBeVisible({ timeout: 30_000 });
+    const group = page.getByRole("group", { name: "Stats range" });
+    await expect(group).toBeVisible({ timeout: 30_000 });
 
     for (const name of ["Today", "7 days", "30 days"]) {
-      await page.getByRole("tab", { name }).click();
-      await expect(page.getByRole("tab", { name })).toHaveAttribute(
-        "aria-selected",
+      await page.getByRole("group", { name: "Stats range" }).getByRole("button", { name }).click();
+      await expect(group.getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
         "true",
       );
     }
 
-    await page.getByRole("tab", { name: "Custom" }).click();
+    await group.getByRole("button", { name: "Custom" }).click();
     // Native date inputs name local days (panel converts with device offset).
     await expect(page.locator('input[type="date"]').first()).toBeVisible();
   });

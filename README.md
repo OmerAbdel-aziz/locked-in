@@ -83,5 +83,7 @@ Every non-obvious choice is recorded as an ADR in [`docs/decisions/`](docs/decis
 | [ADR-002](docs/decisions/ADR-002-anonymous-first-auth.md) | Anonymous-first auth, optional magic link, merge-on-sign-in |
 | [ADR-003](docs/decisions/ADR-003-session-log-canonical.md) | Session log is canonical; everything else is derived |
 | [ADR-004](docs/decisions/ADR-004-two-column-dashboard-layout.md) | Two-column dashboard layout (canonical Stitch screen) |
+| [ADR-005](docs/decisions/ADR-005-server-mirror-in-flight-timer.md) | In-flight timer state mirrored to Convex for refresh recovery |
+| [ADR-006](docs/decisions/ADR-006-arc-ui-on-stats-and-today-donut.md) | /stats + today-donut rebuilt on Arc UI components (themed via CSS bridge) |
 
 Implementation history — including every deliberate deviation — is logged per task in [`tasks/todo.md`](tasks/todo.md); the architecture rationale and dependency graph are in [`tasks/plan.md`](tasks/plan.md).

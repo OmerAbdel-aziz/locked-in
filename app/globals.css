@@ -1,5 +1,8 @@
 @import "tailwindcss";
 @import "@heroui/styles";
+/* Arc UI foundation (ADR-006) — imported before the theme blocks so every
+   `:root` default in it loses any cascade tie to layer 2 below. */
+@import "../components/arc/foundation.css";
 
 /*
  * Locked In design tokens.
@@ -640,6 +643,63 @@
 [data-theme] {
   --font-sans: var(--font-jetbrains), ui-monospace, monospace;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/*
+ * Arc UI bridge (ADR-006) — Arc's semantic tokens re-pointed onto the ten
+ * `data-theme` palettes, the same move layer 3 makes for the legacy
+ * `--color-*` set. The Arc variable NAMES are kept (stats charts, cards and
+ * lists resolve them through Arc's own CSS modules), only their values now
+ * follow the active theme:
+ *
+ *   --surface/-raised/-muted   the tonal surface scale (fonts, tests pin it)
+ *   --text-secondary/--text-muted/--border-*  ghost rules at low opacity
+ *   --accent-strong/--accent-subtle  follow the two-stop CTA gradient hue
+ *   --control-*                selection controls take the accent + glyph rule
+ *   --font-display/--font-body  the all-JetBrains-Mono rule (PRD D6c)
+ *   --radius-*                 the design radius scale, not Arc's 18px pills
+ *
+ * `--background`, `--foreground`, `--accent`, `--accent-foreground`,
+ * `--success/--warning/--danger` and the heatmap's derived `--level-*` /
+ * `--series-*` share their names with the theme blocks, so the imported
+ * foundation defaults already lose to them — re-declared only what Arc
+ * names differently from the app.
+ */
+:root,
+[data-theme] {
+  /* Surfaces: card (surface), elevated (secondary), muted fill (tertiary). */
+  --surface-raised: var(--surface-secondary);
+  --surface-muted: var(--surface-tertiary);
+
+  /* Secondary text + hairline aliases. */
+  --text-secondary: var(--muted);
+  --text-muted: color-mix(in oklab, var(--muted) 72%, transparent);
+  --border-subtle: var(--separator);
+  --border-strong: var(--muted);
+
+  /* Accent variants: stronger = the CTA gradient's darker stop. */
+  --accent-strong: var(--cta-to);
+  --accent-subtle: color-mix(in oklab, var(--accent) 14%, transparent);
+
+  /* Selection controls: accent fill, glyph in the on-accent foreground. */
+  --control-on: var(--accent);
+  --control-glyph: var(--accent-foreground);
+  --control-on-subtle: color-mix(in oklab, var(--accent) 10%, transparent);
+  --control-track: var(--surface-tertiary);
+  --control-track-hover: var(--segment);
+  --control-thumb: var(--surface);
+  --control-thumb-on: var(--accent);
+  --control-thumb-shadow: 0 0 0 0.5px color-mix(in oklab, var(--foreground) 12%, transparent);
+  --control-fill: var(--accent);
+
+  /* Type: the mono rule wins over Arc's Geist/Inter defaults. */
+  --font-display: var(--font-jetbrains), ui-monospace, monospace;
+  --font-body: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* Radius: the design scale (0.25/0.5rem per theme), not Arc's 18px pills. */
+  --radius-control: var(--radius, 0.5rem);
+  --radius-panel: calc(var(--radius, 0.5rem) * 3);
+  --radius-surface: calc(var(--radius, 0.5rem) * 4);
 }
 
 /*

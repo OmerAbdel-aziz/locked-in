@@ -57,6 +57,7 @@ async function logSession(
     startedAt: number;
     completedAt: number;
     taskId?: Id<"tasks">;
+    projectId?: Id<"projects">;
   },
 ) {
   return client.mutation(api.sessions.logCompleted, {
@@ -241,6 +242,17 @@ describe("the Summary bento (todaySummary)", () => {
       focusMinutes: 50,
       completedLeaves: 2,
       estimatedLeaves: 2,
+      // Unbound sessions share the "No project" bucket — the donut never
+      // silently drops time just because no project was attached (ADR-006).
+      perProject: [
+        {
+          projectId: null,
+          name: "No project",
+          archived: false,
+          focusMs: 50 * MIN,
+          sessions: 2,
+        },
+      ],
     });
   });
 
@@ -291,6 +303,15 @@ describe("the Summary bento (todaySummary)", () => {
         focusMinutes: 50,
         completedLeaves: 2,
         estimatedLeaves: 0,
+        perProject: [
+          {
+            projectId: null,
+            name: "No project",
+            archived: false,
+            focusMs: 50 * MIN,
+            sessions: 2,
+          },
+        ],
       },
     );
 
@@ -301,8 +322,61 @@ describe("the Summary bento (todaySummary)", () => {
         focusMinutes: 0,
         completedLeaves: 0,
         estimatedLeaves: 0,
+        perProject: [],
       },
     );
+  });
+
+  it("splits today's focus back into per-project slices for the bento's donut", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+    const { client: t } = await identity();
+
+    const projectId = await t.mutation(api.projects.create, {
+      name: "Thesis",
+    });
+
+    await logSession(t, {
+      projectId,
+      startedAt: NOW - 30 * MIN,
+      completedAt: NOW - 5 * MIN,
+    });
+    await logSession(t, {
+      startedAt: NOW - 25 * MIN,
+      completedAt: NOW,
+    });
+
+    // Two focus leave — the bound one is named; the unbound one shares the
+    // "No project" bucket — sorted by focus time, the bound one first.
+    await expect(
+      (await t.query(api.tasks.todaySummary, { tzOffsetMinutes: 0 })).perProject,
+    ).toEqual([
+      {
+        projectId,
+        name: "Thesis",
+        archived: false,
+        focusMs: 25 * MIN,
+        sessions: 1,
+      },
+      {
+        projectId: null,
+        name: "No project",
+        archived: false,
+        focusMs: 25 * MIN,
+        sessions: 1,
+      },
+    ]);
+
+    // A break never reaches the donut: no task is made of breaks (and the
+    // slices only ever grow from focus rows).
+    await logSession(t, {
+      phase: "short",
+      projectId,
+      startedAt: NOW,
+      completedAt: NOW + 5 * MIN,
+    });
+    expect(
+      (await t.query(api.tasks.todaySummary, { tzOffsetMinutes: 0 })).perProject,
+    ).toHaveLength(2);
   });
 
   it("is recomputed, not remembered — a new session moves it", async () => {

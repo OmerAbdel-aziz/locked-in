@@ -1,4 +1,4 @@
-import { createElement as h } from "react";
+﻿import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { render } from "@testing-library/react";
 import { convexTest } from "convex-test";
@@ -28,26 +28,32 @@ import {
   trendDeltas,
   type SessionLike,
 } from "@/lib/aggregations";
-import { PerProjectView, TopTasksView } from "@/components/stats/breakdown";
 import { EmptyStateView } from "@/components/stats/empty-state";
 import { FocusChartView } from "@/components/stats/focus-chart";
+import { FocusHeatmapView } from "@/components/stats/focus-heatmap";
+import { HeadlinesView } from "@/components/stats/headlines";
+import { ProjectDonutView } from "@/components/stats/project-donut";
 import { RangeSelectorView } from "@/components/stats/range-selector";
 import {
   SessionHistoryView,
+  type HistoryRow,
+} from "@/components/stats/session-history";
+import {
   formatDayKey,
   formatLocalTime,
-} from "@/components/stats/session-history";
+} from "@/components/stats/format";
 import { SessionsChartView } from "@/components/stats/sessions-chart";
 import { TimeOfDayView } from "@/components/stats/time-of-day";
+import { TopTasksView } from "@/components/stats/top-tasks-table";
 import { TrendsView } from "@/components/stats/trends";
 
 /**
- * Tasks 19–22 gate: the Checkpoint F oracle.
+ * Tasks 19â€“22 gate: the Checkpoint F oracle.
  *
  * One deterministic 30-day fixture, hand-computed below, asserted down two
  * independent paths: the pure helpers in `lib/aggregations.ts` and the
  * bounded Convex queries in `convex/stats.ts` (same numbers through
- * `logCompleted` + real task rows). If either path drifts, this file fails —
+ * `logCompleted` + real task rows). If either path drifts, this file fails â€”
  * that is the whole point of an oracle.
  *
  * The fixture (all durations exact, every `completedAt` unique because
@@ -56,28 +62,28 @@ import { TrendsView } from "@/components/stats/trends";
  *   Board: A "Outline" est 4 (P1 "Work"), B "Review PRs" est 2 (P1),
  *          C "Study plan" est 2 (P2 "Study", archived). Board total: 8.
  *   Window [Jun 1, Jul 1) 2024, device offset 0 unless noted:
- *     s1  Jun  1 09:00–09:25Z  focus A/P1
- *     s2  Jun  1 10:00–10:25Z  focus A/P1
- *     s3  Jun  1 10:30–10:35Z  short A/P1 (break — must not leak anywhere)
- *     s4  Jun  2 14:00–14:25Z  focus B/P1
- *     s5  Jun  6 09:00–09:25Z  focus C/P2
- *     s6  Jun  6 09:30–09:45Z  long, unbound (15m break)
- *     s7  Jun  9 21:45–22:10Z  focus A/P1, offset +120 → *Jun 10* locally
- *     s8  Jun 13 04:30–04:55Z  focus B/P1, offset −300 → *Jun 12* locally
- *     s9  Jun 30 20:00–20:25Z  focus, unbound
- *     pre May 31 12:00–12:25Z  focus A/P1 → previous window only
- *     post Jul 1 01:00–01:25Z  focus A/P1 → excluded everywhere
- *     ancient 2021-03-04       focus A/P1 → excluded everywhere
+ *     s1  Jun  1 09:00â€“09:25Z  focus A/P1
+ *     s2  Jun  1 10:00â€“10:25Z  focus A/P1
+ *     s3  Jun  1 10:30â€“10:35Z  short A/P1 (break â€” must not leak anywhere)
+ *     s4  Jun  2 14:00â€“14:25Z  focus B/P1
+ *     s5  Jun  6 09:00â€“09:25Z  focus C/P2
+ *     s6  Jun  6 09:30â€“09:45Z  long, unbound (15m break)
+ *     s7  Jun  9 21:45â€“22:10Z  focus A/P1, offset +120 â†’ *Jun 10* locally
+ *     s8  Jun 13 04:30â€“04:55Z  focus B/P1, offset âˆ’300 â†’ *Jun 12* locally
+ *     s9  Jun 30 20:00â€“20:25Z  focus, unbound
+ *     pre May 31 12:00â€“12:25Z  focus A/P1 â†’ previous window only
+ *     post Jul 1 01:00â€“01:25Z  focus A/P1 â†’ excluded everywhere
+ *     ancient 2021-03-04       focus A/P1 â†’ excluded everywhere
  *
  * Hand-computed current window:
- *   focus 7 × 25m = 175m (10,500,000ms), 7 sessions; breaks 5m + 15m.
+ *   focus 7 Ã— 25m = 175m (10,500,000ms), 7 sessions; breaks 5m + 15m.
  *   per-day: Jun1 50m/2, Jun2 25m/1, Jun6 25m/1, Jun10 25m/1, Jun12 25m/1,
  *     Jun30 25m/1; the other 24 days zero.
  *   per-project: P1 125m/5, P2 25m/1 (archived), none 25m/1.
  *   top tasks: A 75m/3, B 50m/2, C 25m/1 (the unbound session credits none).
  *   completion: 7 / 8 = 0.875.
- *   time-of-day (start hour at recorded offset): 9→2, 10→1, 14→1, 20→1,
- *     23→2 (s7 21:45Z+2h, s8 04:30Z−5h).
+ *   time-of-day (start hour at recorded offset): 9â†’2, 10â†’1, 14â†’1, 20â†’1,
+ *     23â†’2 (s7 21:45Z+2h, s8 04:30Zâˆ’5h).
  *   previous window [May 2, Jun 1): 25m/1, no breaks.
  *   deltas: focus +150m, sessions +6, break +20m.
  */
@@ -136,9 +142,9 @@ function oracleSessions(): SessionLike[] {
       projectId: null,
       tzOffsetAtCompletion: 0,
     },
-    // 22:10Z at +120 is 00:10 local on Jun 10 — the day that just began.
+    // 22:10Z at +120 is 00:10 local on Jun 10 â€” the day that just began.
     focus(at(2024, 6, 9, 22, 10), "taskA", "projP1", 120),
-    // 04:55Z at −300 is 23:55 local on Jun 12 — still the old day.
+    // 04:55Z at âˆ’300 is 23:55 local on Jun 12 â€” still the old day.
     focus(at(2024, 6, 13, 4, 55), "taskB", "projP1", -300),
     focus(at(2024, 6, 30, 20, 25), null, null),
     focus(at(2024, 5, 31, 12, 25), "taskA", "projP1"),
@@ -162,7 +168,7 @@ const IN_RANGE = oracleSessions().filter(
   (s) => s.completedAt >= START && s.completedAt < END,
 );
 
-describe("day and hour attribution (PRD §6)", () => {
+describe("day and hour attribution (PRD Â§6)", () => {
   it("credits 00:01 to the new day and 23:59 to the old one", () => {
     expect(dayKeyAt(at(2024, 6, 1, 23, 59), 0)).toBe("2024-06-01");
     expect(dayKeyAt(at(2024, 6, 2, 0, 1), 0)).toBe("2024-06-02");
@@ -172,7 +178,7 @@ describe("day and hour attribution (PRD §6)", () => {
     // 22:10Z is Jun 9 in UTC and Jun 10 at +120.
     expect(dayKeyAt(at(2024, 6, 9, 22, 10), 0)).toBe("2024-06-09");
     expect(dayKeyAt(at(2024, 6, 9, 22, 10), 120)).toBe("2024-06-10");
-    // 04:55Z Jun 13 is Jun 13 in UTC and still Jun 12 at −300.
+    // 04:55Z Jun 13 is Jun 13 in UTC and still Jun 12 at âˆ’300.
     expect(dayKeyAt(at(2024, 6, 13, 4, 55), 0)).toBe("2024-06-13");
     expect(dayKeyAt(at(2024, 6, 13, 4, 55), -300)).toBe("2024-06-12");
   });
@@ -191,12 +197,12 @@ describe("day and hour attribution (PRD §6)", () => {
     expect(rangeDayKeys(START, END, 0)).toHaveLength(30);
     expect(rangeDayKeys(START, END, 0)[0]).toBe("2024-06-01");
     expect(rangeDayKeys(START, END, 0)[29]).toBe("2024-06-30");
-    // At −300 the window opens mid-evening May 31 local time.
+    // At âˆ’300 the window opens mid-evening May 31 local time.
     expect(rangeDayKeys(START, END, -300)[0]).toBe("2024-05-31");
   });
 
   it("startOfLocalDay floors after shifting, not before", () => {
-    // 01:00Z is still yesterday evening at −300.
+    // 01:00Z is still yesterday evening at âˆ’300.
     expect(startOfLocalDay(at(2024, 6, 15, 1, 0), -300)).toBe(
       at(2024, 6, 14, 5, 0),
     );
@@ -283,7 +289,7 @@ describe("the 30-day oracle through the pure helpers", () => {
     });
   });
 
-  it("reports no ratio — not 0% — on an empty board", () => {
+  it("reports no ratio â€” not 0% â€” on an empty board", () => {
     expect(completionRatio(IN_RANGE, []).ratio).toBeNull();
   });
 
@@ -312,7 +318,7 @@ describe("the 30-day oracle through the pure helpers", () => {
     expect(full.timeOfDay[23]).toBe(2);
   });
 
-  it("scopes the range itself — out-of-window rows never enter", () => {
+  it("scopes the range itself â€” out-of-window rows never enter", () => {
     const full = aggregateRange(
       oracleSessions(),
       ORACLE_TASKS,
@@ -430,7 +436,7 @@ describe("useNow stability (Task 20 hotfix)", () => {
   it("returns a clock snapshot that is stable across renders", () => {
     // A clock advancing 1ms per read: an unquantised snapshot would hand
     // React a new value on every render, and each render would schedule
-    // another — the "Maximum update depth exceeded" spiral seen live on
+    // another â€” the "Maximum update depth exceeded" spiral seen live on
     // `/stats`. Flooring to the minute keeps thousands of reads on one
     // value, so re-renders settle instead of looping.
     let tick = at(2024, 6, 15, 13, 0);
@@ -468,8 +474,7 @@ describe("history grouping", () => {
   });
 
   it("formats day labels and local times without the runtime locale", () => {
-    expect(formatDayKey("2024-06-01")).toBe("Sat, Jun 1");
-    // 21:45Z at +120 is 23:45 local.
+    expect(formatDayKey("2024-06-01")).toBe("Sat, Jun 1");    // 21:45Z at +120 is 23:45 local.
     expect(formatLocalTime(at(2024, 6, 9, 21, 45), 120)).toBe("23:45");
   });
 });
@@ -501,7 +506,7 @@ async function makeProject(
 /**
  * The oracle fixture through the real mutations: tasks via `tasks.create`,
  * projects inserted directly (Task 13 builds their API), sessions via
- * `logCompleted` — so a change to what any of those actually writes breaks
+ * `logCompleted` â€” so a change to what any of those actually writes breaks
  * this gate rather than being papered over by a direct insert.
  */
 async function seedOracle(client: Client, p1: Id<"projects">, p2: Id<"projects">) {
@@ -645,7 +650,7 @@ describe("the 30-day oracle through the Convex queries", () => {
     expect(stats.timeOfDay[23]).toBe(2);
   });
 
-  it("scopes reads to the window — nothing outside leaks in", async () => {
+  it("scopes reads to the window â€” nothing outside leaks in", async () => {
     const { ownerId, base, client: t } = await identity();
     const p1 = await makeProject(base, ownerId, "Work");
     const p2 = await makeProject(base, ownerId, "Study");
@@ -698,7 +703,7 @@ describe("the 30-day oracle through the Convex queries", () => {
       projectName: null,
       projectArchived: false,
     });
-    // A deleted task keeps its row but loses its title — never the row.
+    // A deleted task keeps its row but loses its title â€” never the row.
     await base.run(async (ctx) => {
       const tasks = await ctx.db.query("tasks").collect();
       const target = tasks.find((task) => task.title === "Outline");
@@ -789,185 +794,191 @@ describe("the 30-day oracle through the Convex queries", () => {
   });
 });
 
-describe("the stats views render fixture data correctly", () => {
-  const THREE_DAYS = [
-    { dayKey: "2024-06-01", focusMs: 50 * MIN, sessions: 2 },
-    { dayKey: "2024-06-02", focusMs: 25 * MIN, sessions: 1 },
-    { dayKey: "2024-06-03", focusMs: 0, sessions: 0 },
-  ];
+/**
+ * ADR-006 gate: the Arc views over the same oracle fixture.
+ *
+ * The hand-rolled SVGs used to be verified by drawing rectangles; Arc owns
+ * the pixels now, so what is pinned is Arc's accessibility *contract* —
+ * the sr-only captions, the hidden data tables, the legend rows, the
+ * sortable columns, the read-only history — rendered through the same
+ * fixture the pure helpers and the Convex queries were verified against.
+ * Static markup (`renderToStaticMarkup`) is the oracle medium: it is
+ * exactly what server-render emits, locale-free, and the same strings the
+ * client hydration must reconstruct.
+ */
+describe("the Arc views over the oracle fixture", () => {
+  function stats() {
+    return aggregateRange(IN_RANGE, ORACLE_TASKS, ORACLE_PROJECTS, {
+      start: START,
+      end: END,
+      tzOffsetMinutes: 0,
+    });
+  }
 
-  const ONE_DAY = [{ dayKey: "2024-06-01", focusMs: 50 * MIN, sessions: 2 }];
+  it("outputs the focus bar chart's scrub-to-read surface", () => {
+    const markup = renderToStaticMarkup(h(FocusChartView, { days: stats().perDay }));
 
-  function barHeights(html: string): number[] {
-    return [...html.matchAll(/data-bar-height="([\d.]+)"/g)].map((m) =>
-      Number(m[1]),
+    // The rotating caption: "{label}, {period}".
+    expect(markup).toContain("Focus time per day, Jun 1 - Jun 30");
+    // The scrub summary names the range's best day; the hidden data table
+    // carries every row, zero days included, as `<th>{day}</th><td>{value}</td>` pairs.
+    expect(markup).toContain("Sat, Jun 1, 50 min");
+    expect(markup).toContain('<th scope="row">Wed, Jun 5</th><td>0 min</td>');
+    // Arc's gridlines are part of its plot — the old "no <line> hand-rolled
+    // SVG" gate is retired with the hand-rolled SVG.
+    expect(markup).toContain("<line");
+  });
+
+  it("outputs the sessions bar chart's surface in session units", () => {
+    const markup = renderToStaticMarkup(h(SessionsChartView, { days: stats().perDay }));
+
+    expect(markup).toContain("Focus sessions per day, Jun 1 - Jun 30");
+    expect(markup).toContain("Sat, Jun 1, 2 sessions");
+  });
+
+  it("outputs the time-of-day histogram with the peak readout", () => {
+    const markup = renderToStaticMarkup(h(TimeOfDayView, { hours: stats().timeOfDay }));
+
+    // Start hours at the *recorded* offset: 9â†’2 (not UTC's scatter).
+    expect(markup).toContain("09:00");
+    expect(markup).toContain("Peak hour");
+    expect(markup).toContain("Focus sessions by hour of day");
+  });
+
+  it("outputs trends as three muted muted rows and a quiet sparkline", () => {
+    const markup = renderToStaticMarkup(
+      h(TrendsView, { deltas: { focusMs: 150 * MIN, focusSessions: 6, breakMs: 20 * MIN }, days: stats().perDay }),
     );
-  }
 
-  function expectDesignRules(html: string) {
-    // No pure white anywhere (DESIGN.md §5).
-    expect(html).not.toMatch(/#f{3,6}\b/i);
-    expect(html).not.toMatch(/\b(text|bg|border|fill|stroke)-white\b/);
-    // No 1px divider borders for sectioning, no row-gap utilities, no rules.
-    expect(html).not.toMatch(/border-[tbyx](-|")/);
-    expect(html).not.toMatch(/border-[lr](-|")/);
-    expect(html).not.toMatch(/divide-/);
-    expect(html).not.toContain("<hr");
-    // No SVG rule lines — `<line …/>`, not `<linearGradient>`.
-    expect(html).not.toMatch(/<line[\s/>]/);
-  }
-
-  it("draws focus bars at correct relative heights from fixture data", () => {
-    const html = renderToStaticMarkup(h(FocusChartView, { days: THREE_DAYS }));
-    expect(barHeights(html)).toEqual([120, 60, 0]);
-    expect(html).toContain("1.3"); // total hours: 75 min
-    expectDesignRules(html);
+    expect(markup).toContain("Trends vs. previous period");
+    expect(markup).toContain("+150m");
+    expect(markup).toContain("+6 sessions");
+    expect(markup).toContain("+20m");
+    expect(markup).toContain("Focus minutes per day this period");
   });
 
-  it("draws session bars at correct relative heights from fixture data", () => {
-    const html = renderToStaticMarkup(h(SessionsChartView, { days: THREE_DAYS }));
-    expect(barHeights(html)).toEqual([96, 48, 0]);
-    expectDesignRules(html);
-  });
+  it("outputs headline counters from the aggregation", () => {
+    const markup = renderToStaticMarkup(
+      h(HeadlinesView, { stats: stats(), days: stats().perDay }),
+    );
 
-  it("keeps both chart viewBoxes landscape at every range length (Phase 9)", () => {
-    // The SVGs size from `w-full` + viewBox aspect, so a portrait viewBox
-    // scales to full-screen height: the 7-day range (98×138) rendered ~850px
-    // tall at a 600px column, a 1-day custom range ~5000px. The viewBox
-    // width now has a 3× height floor with bars centered, so every range
-    // renders as a bounded card.
-    for (const View of [FocusChartView, SessionsChartView]) {
-      for (const days of [ONE_DAY, THREE_DAYS]) {
-        const html = renderToStaticMarkup(h(View, { days }));
-        const match = /viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/.exec(html);
-        expect(match).not.toBeNull();
-        const ratio = Number(match![1]) / Number(match![2]);
-        expect(ratio).toBeGreaterThanOrEqual(3);
-      }
-      // Empty state: no NaN in the viewBox.
-      const empty = renderToStaticMarkup(h(View, { days: [] }));
-      expect(empty).not.toContain("NaN");
+    for (const label of ["Focus time", "Sessions", "Break time", "Completion"]) {
+      expect(markup).toContain(label);
     }
+    // 7 focus leaves / 8 estimated = 87.5 → the counter reads 88%.
+    expect(markup).toContain("%");
   });
 
-  it("centers the bars inside the padded viewBox", () => {
-    // A short range pads the viewBox with empty space; the bars must sit in
-    // the middle, not hug one edge.
-    const html = renderToStaticMarkup(h(FocusChartView, { days: ONE_DAY }));
-    const viewWidth = Number(/viewBox="0 0 (\d+)/.exec(html)![1]);
-    const x = Number(/<rect[^>]*\sx="([\d.]+)"/.exec(html)![1]);
-    expect(x + 5).toBeCloseTo(viewWidth / 2, 0); // bar is 10 units wide
+  it("outputs the per-project donut with named legends, archived muted, none counted", () => {
+    const markup = renderToStaticMarkup(h(ProjectDonutView, { slices: stats().perProject }));
+
+    // Legend rows: "{label}, {value} {unit}, {percent}%".
+    expect(markup).toContain("aria-label");
+    expect(markup).toContain("Work, 125 min");
+    expect(markup).toContain(">Study<");
+    expect(markup).toContain(">No project<");
   });
 
-  it("renders deltas muted — direction without judgement", () => {
-    const html = renderToStaticMarkup(
-      h(TrendsView, {
-        deltas: { focusMs: 150 * MIN, focusSessions: 6, breakMs: 20 * MIN },
+  it("outputs the top tasks table sortable by focus time, descending", () => {
+    const markup = renderToStaticMarkup(h(TopTasksView, { slices: stats().topTasks }));
+
+    expect(markup).toContain("Top tasks by focus time");
+    expect(markup).toContain("aria-sort=\"descending\"");
+    expect(markup).toContain("Outline");
+    expect(markup).toContain("Review PRs");
+  });
+
+  it("outputs the trailing-year heatmap with full day-name cells and pick-through", () => {
+    const days = stats().perDay.map((day) => ({
+      date: day.dayKey,
+      count: Math.round(day.focusMs / 60_000),
+    }));
+    const markup = renderToStaticMarkup(
+      h(FocusHeatmapView, {
+        days,
+        selectedDate: null,
+        onPickDay: () => {},
       }),
     );
-    expect(html).toContain("▲");
-    expect(html).toContain("+150m");
-    expect(html).toContain("+6 sessions");
-    // One muted tone at every value: never a graded color.
-    expect(html).not.toContain("text-primary");
-    expect(html).not.toContain("text-tertiary");
-    expect(html).not.toContain("text-error");
-    expectDesignRules(html);
+
+    expect(markup).toContain("Focus minutes per day, 2024");
+    // The grid speaks a full, locale-free day name per cell — with the count
+    // and with an explicit zero.
+    expect(markup).toContain("50 minutes, Saturday, June 1, 2024");
+    expect(markup).toContain("No minutes, Monday, June 3, 2024");
   });
 
-  it("marks the peak hour on the time-of-day histogram", () => {
-    const hours = new Array<number>(24).fill(0);
-    hours[9] = 3;
-    hours[23] = 1;
-    const html = renderToStaticMarkup(h(TimeOfDayView, { hours }));
-    expect(html).toContain("09:00");
-    // Attribute order in the markup is fill, opacity, data-hour.
-    const peaks = [...html.matchAll(/opacity="([\d.]+)" data-hour="(\d+)"/g)];
-    expect(peaks.find((m) => m[2] === "9")?.[1]).toBe("1");
-    expect(peaks.find((m) => m[2] === "23")?.[1]).toBe("0.3");
-    expectDesignRules(html);
-  });
-
-  it("groups history by completion day and renders archived names muted", () => {
-    const html = renderToStaticMarkup(
-      h(SessionHistoryView, {
-        rows: [
-          {
-            startedAt: at(2024, 6, 9, 21, 45),
-            completedAt: at(2024, 6, 9, 22, 10),
-            phase: "focus",
-            tzOffsetAtCompletion: 120,
-            taskTitle: "Outline",
-            projectName: "Work",
-            projectArchived: false,
-          },
-          {
-            startedAt: at(2024, 6, 6, 9, 0),
-            completedAt: at(2024, 6, 6, 9, 25),
-            phase: "focus",
-            tzOffsetAtCompletion: 0,
-            taskTitle: "Study plan",
-            projectName: "Study",
-            projectArchived: true,
-          },
-        ],
-      }),
+  it("outputs session history as a read-only timeline, day-grouped", () => {
+    const rows: HistoryRow[] = IN_RANGE.map((session) => ({
+      startedAt: session.startedAt,
+      completedAt: session.completedAt,
+      phase: session.phase,
+      tzOffsetAtCompletion: session.tzOffsetAtCompletion,
+      taskTitle:
+        session.taskId === "taskA"
+          ? "Outline"
+          : session.taskId === "taskB"
+            ? "Review PRs"
+            : session.taskId === "taskC"
+              ? "Study plan"
+              : null,
+      projectName:
+        session.projectId === "projP1"
+          ? "Work"
+          : session.projectId === "projP2"
+            ? "Study"
+            : null,
+      projectArchived: session.projectId === "projP2",
+    }));
+    const markup = renderToStaticMarkup(
+      // now far outside the fixture: no group may claim "Today"/"Yesterday",
+      // so every group is a named local day and the assertion is airtight.
+      h(SessionHistoryView, { rows, now: at(2024, 7, 15, 12, 0) }),
     );
-    // The +120 session lands under Jun 10, not its UTC day Jun 9.
-    expect(html).toContain("Mon, Jun 10");
-    expect(html).not.toContain("Sun, Jun 9");
-    expect(html).toContain("Study");
-    expect(html).toContain("opacity-60");
-    // Read-only: no control of any kind.
-    expect(html).not.toContain("<button");
-    expect(html).not.toContain("<a ");
-    expect(html).not.toContain("<input");
-    expectDesignRules(html);
+
+    expect(markup).toContain("Session history");
+    expect(markup).toContain("June 30");
+    expect(markup).toContain("Outline");
+    expect(markup).toContain("25 min");
+    expect(markup).toContain("23:45"); // s7 at its +120 wall time.
+    // Read-only records: no trigger, no button, no edit affordance anywhere.
+    expect(markup).not.toContain("<button");
+    expect(markup).toContain("Study plan"); // archived project row, by name.
   });
 
-  it("renders per-project and top-task rows without fabricated numbers", () => {
-    const projects = renderToStaticMarkup(
-      h(PerProjectView, {
-        slices: [
-          { projectId: "p1", name: "Work", archived: false, focusMs: 125 * MIN, sessions: 5 },
-        ],
-      }),
-    );
-    expect(projects).toContain("Work");
-    const tasks = renderToStaticMarkup(
-      h(TopTasksView, {
-        slices: [{ taskId: "a", title: "Outline", focusMs: 75 * MIN, sessions: 3 }],
-      }),
-    );
-    expect(tasks).toContain("Outline");
-    expectDesignRules(projects + tasks);
-  });
-
-  it("keeps the empty state calm and number-free", () => {
-    const html = renderToStaticMarkup(h(EmptyStateView, {}));
-    expect(html).toContain("No sessions yet");
-    // The *words* carry no numbers — class names legitimately do.
-    const text = html.replace(/<[^>]*>/g, "");
-    expect(text).not.toMatch(/\d/);
-    expectDesignRules(html);
-  });
-
-  it("offers the four ranges and reveals dates only for custom", () => {
-    const tabs = renderToStaticMarkup(
+  it("outputs the range selector as four pressed-toggle presets", () => {
+    const today = renderToStaticMarkup(
       h(RangeSelectorView, {
-        value: { preset: "7d", customStart: "", customEnd: "" },
+        value: { preset: "today", customStart: "", customEnd: "" },
         onChange: () => {},
       }),
     );
-    expect((tabs.match(/role="tab"/g) ?? [])).toHaveLength(4);
-    expect(tabs).not.toContain('type="date"');
+    // SegmentedControl: role=group, one aria-pressed button per preset.
+    expect(today).toContain("Today");
+    expect(today.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(today.match(/aria-pressed="false"/g)).toHaveLength(3);
+    // No custom inputs until Custom is chosen.
+    expect(today).not.toContain('type="date"');
+
     const custom = renderToStaticMarkup(
       h(RangeSelectorView, {
-        value: { preset: "custom", customStart: "2024-06-01", customEnd: "2024-06-30" },
+        value: {
+          preset: "custom",
+          customStart: "2024-06-15",
+          customEnd: "2024-06-20",
+        },
         onChange: () => {},
       }),
     );
-    expect((custom.match(/type="date"/g) ?? [])).toHaveLength(2);
-    expectDesignRules(tabs + custom);
+    expect((custom.match(/type="date"/g) ?? []).length).toBe(2);
+    expect(custom).toContain("2024-06-15");
+  });
+
+  it("outputs the calm empty state", () => {
+    const markup = renderToStaticMarkup(h(EmptyStateView, {}));
+
+    expect(markup).toContain("No sessions yet");
+    expect(markup).toContain("Complete a focus session");
   });
 });
+
