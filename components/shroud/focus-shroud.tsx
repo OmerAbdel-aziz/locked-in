@@ -149,6 +149,13 @@ export function ShroudToggle() {
  * state. The structural classes live here (not in the page's `className`,
  * which carries only extras like `enter`) so the two spans can never be
  * passed together and fight over the cascade.
+ *
+ * The column is also `lg:sticky lg:top-20` (Phase 9 polish): with a long
+ * task/project list the right column grows past the viewport, and a timer
+ * that scrolled off the top is no use to anyone. Sticky only at `lg:` — on
+ * mobile the timer already sits above the list, so sticking it would just
+ * cover the thing being read. The offset clears the 64px header with a
+ * small gap.
  */
 export function ShroudColumn({
   className,
@@ -162,7 +169,7 @@ export function ShroudColumn({
     <div
       data-testid="shroud-column"
       data-shroud-elevated={active ? "true" : "false"}
-      className={`col-span-12 flex min-w-0 flex-col items-center justify-center ${
+      className={`col-span-12 flex min-w-0 flex-col items-center justify-center self-start lg:sticky lg:top-20 ${
         active ? "relative z-50 lg:col-span-12" : "lg:col-span-7"
       } ${className}`}
     >

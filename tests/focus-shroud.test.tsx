@@ -186,6 +186,22 @@ describe("timer + active task stay above the veil", () => {
     expect(column.className).not.toContain("z-50");
   });
 
+  it("sticks the timer column at the top of the viewport on desktop", () => {
+    // Phase 9: a long task/project list scrolls the timer off-screen; the
+    // left column stays pinned so the countdown stays readable. Gated to
+    // lg: only — on mobile the timer already sits above the list.
+    render(<Page />);
+    const column = screen.getByTestId("shroud-column");
+    expect(column.className).toContain("lg:sticky");
+    expect(column.className).toContain("lg:top-20");
+    // `self-start` is the load-bearing part: a grid item stretches to the
+    // row height by default, and a sticky element that is already as tall
+    // as its containing block never sticks (the original bug).
+    expect(column.className).toContain("self-start");
+    // Mobile must NOT stick: the timer sits above the list there, so
+    // pinning it would cover what is being read.
+    expect(column.className.split(/\s+/)).not.toContain("sticky");
+  });
   it("elevates the engine section to z-50 only while the shroud is up", () => {
     render(<TimerEngine />);
     const section = screen.getByRole("region", { name: "Timer engine" });
