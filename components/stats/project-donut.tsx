@@ -19,7 +19,7 @@ import { NO_PROJECT_LABEL, type ProjectSlice } from "@/lib/aggregations";
 
 import { seriesColorFor } from "./format";
 
-const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
 export function ProjectDonutView({ slices }: { slices: ProjectSlice[] }) {
   return (
@@ -31,11 +31,11 @@ export function ProjectDonutView({ slices }: { slices: ProjectSlice[] }) {
         data={slices.map((slice) => ({
           key: slice.projectId ?? NO_PROJECT_LABEL,
           label: slice.name,
-          value: Math.round(slice.focusMs / 60_000),
+          value: Number((slice.focusMs / 3_600_000).toFixed(1)),
           color: seriesColorFor(slice.projectId ?? NO_PROJECT_LABEL),
         }))}
         label="Focus time by project"
-        unit="min"
+        unit="hrs"
         totalLabel="Focus"
         size={168}
         thickness={16}

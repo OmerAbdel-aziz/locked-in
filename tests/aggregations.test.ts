@@ -874,7 +874,7 @@ describe("the Arc views over the oracle fixture", () => {
 
     // Legend rows: "{label}, {value} {unit}, {percent}%".
     expect(markup).toContain("aria-label");
-    expect(markup).toContain("Work, 125 min");
+    expect(markup).toContain("Work, 2.1 hrs");
     expect(markup).toContain(">Study<");
     expect(markup).toContain(">No project<");
   });
