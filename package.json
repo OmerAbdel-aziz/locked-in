@@ -20,7 +20,7 @@
     "convex": "^1.46.0",
     "lucide-react": "^1.59.0",
     "motion": "^14.3.0",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-variants": "^3.3.1",
