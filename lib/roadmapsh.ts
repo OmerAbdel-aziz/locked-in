@@ -66,7 +66,7 @@ function parseNode(n: RoadmapShNode): ParsedUnit | null {
 }
 
 export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
-  const rawTitle = payload.title ?? payload.name;
+  const rawTitle: any = payload.title ?? payload.name;
   const name = (typeof rawTitle === "object" && rawTitle !== null
     ? (rawTitle.page ?? rawTitle.card ?? rawTitle.label ?? "Imported roadmap")
     : rawTitle ?? "Imported roadmap").toString().trim() || "Imported roadmap";
