@@ -44,7 +44,7 @@ export interface ParsedRoadmap {
 }
 
 function unitTitle(n: RoadmapShNode): string {
-  return (n.title ?? n.name ?? "").trim();
+  return (String(n.title ?? n.name ?? "")).trim();
 }
 
 function unitEstimate(n: RoadmapShNode): number {
@@ -66,7 +66,7 @@ function parseNode(n: RoadmapShNode): ParsedUnit | null {
 }
 
 export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
-  const name = (payload.title ?? payload.name ?? "Imported roadmap").trim() || "Imported roadmap";
+  const name = (String(payload.title ?? payload.name ?? "Imported roadmap")).trim() || "Imported roadmap";
 
   const groups: RoadmapShGroup[] =
     payload.groups ?? payload.children ?? [];
@@ -75,7 +75,7 @@ export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
 
   if (groups.length > 0) {
     for (const g of groups) {
-      const gname = (g.title ?? g.name ?? "Milestone").trim() || "Milestone";
+      const gname = (String(g.title ?? g.name ?? "Milestone")).trim() || "Milestone";
       const nodes = g.nodes ?? g.children ?? [];
       const units = nodes
         .map(parseNode)
