@@ -273,3 +273,52 @@ export const overview = query({
     };
   },
 });
+
+export const setPlan = mutation({
+  args: {
+    projectId: v.id("projects"),
+    hours: v.union(v.number(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+    const project = await requireOwnedProject(ctx, ownerId, args.projectId);
+    await ctx.db.patch(project._id, {
+      planWeeklyFocusHours:
+        args.hours === null ? undefined : args.hours,
+    });
+  },
+});
+
+export const pace = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+    const project = await requireOwnedProject(ctx, ownerId, args.projectId);
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_owner_completed", (q) => q.eq("ownerId", ownerId))
+      .take(SESSION_LIMIT);
+
+    const now = Date.now();
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    let actualMs = 0;
+    let lastBoundMs: number | null = null;
+    for (const s of sessions) {
+      if (s.projectId !== project._id || s.phase !== "focus") continue;
+      if (s.completedAt >= weekAgo) {
+        actualMs += s.completedAt - s.startedAt;
+      }
+      if (lastBoundMs === null || s.completedAt > lastBoundMs) {
+        lastBoundMs = s.completedAt;
+      }
+    }
+
+    return {
+      planHours: project.planWeeklyFocusHours ?? null,
+      actualMinutes: Math.round(actualMs / 60000),
+      lastBoundMs,
+      nowMs: now,
+    };
+  },
+});

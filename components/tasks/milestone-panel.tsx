@@ -6,6 +6,7 @@ import { Button, Input } from "@heroui/react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { PacePanel } from "./pace-panel";
 
 /**
  * Milestones grouped above a roadmap's units (issue 02).
@@ -55,6 +56,7 @@ export function MilestonePanel({ projectId }: { projectId: Id<"projects"> }) {
 
   return (
     <section aria-label="Roadmap milestones" className="space-y-3">
+      <PacePanel projectId={projectId} />
       {nextUp === undefined ? null : nextUp === null ? (
         <p className="rounded-xl bg-surface-container-low/50 px-4 py-3 text-sm text-on-surface-variant/70">
           Nothing left to do — roadmap complete.
