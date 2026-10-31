@@ -241,6 +241,21 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_owner_project", ["ownerId", "projectId"]),
 
+  /**
+   * Published roadmap templates (v2 social). Stored as a snapshot so forks
+   * never touch the source. `hidden` flips on report; `deletedAt` on unpublish.
+   */
+  templates: defineTable({
+    ownerId: v.id("users"),
+    name: v.string(),
+    publishedAt: v.number(),
+    hidden: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+    data: v.any(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_published", ["publishedAt"]),
+
   /** One row per owner, written lazily on first use. */
   settings: defineTable({
     ownerId: v.id("users"),

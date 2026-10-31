@@ -13,6 +13,7 @@ import type * as http from "../http.js";
 import type * as lib_merge from "../lib/merge.js";
 import type * as lib_order from "../lib/order.js";
 import type * as lib_owner from "../lib/owner.js";
+import type * as lib_roadmapsh from "../lib/roadmapsh.js";
 import type * as merge from "../merge.js";
 import type * as milestones from "../milestones.js";
 import type * as projects from "../projects.js";
@@ -22,6 +23,7 @@ import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
 import type * as stats from "../stats.js";
 import type * as tasks from "../tasks.js";
+import type * as templates from "../templates.js";
 import type * as timer_state from "../timer_state.js";
 
 import type {
@@ -36,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "lib/merge": typeof lib_merge;
   "lib/order": typeof lib_order;
   "lib/owner": typeof lib_owner;
+  "lib/roadmapsh": typeof lib_roadmapsh;
   merge: typeof merge;
   milestones: typeof milestones;
   projects: typeof projects;
@@ -45,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   stats: typeof stats;
   tasks: typeof tasks;
+  templates: typeof templates;
   timer_state: typeof timer_state;
 }>;
 

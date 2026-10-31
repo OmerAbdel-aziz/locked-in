@@ -128,6 +128,14 @@ const PRD_6: Record<string, Record<string, boolean>> = {
     boundProjectId: false,
     updatedAt: true,
   },
+  templates: {
+    ownerId: true,
+    name: true,
+    publishedAt: true,
+    hidden: false,
+    deletedAt: false,
+    data: true,
+  },
 };
 
 /**
