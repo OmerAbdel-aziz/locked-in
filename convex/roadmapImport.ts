@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import { orderBetween } from "./lib/order";
-import { requireOwnedProject, resolveOwner } from "./lib/owner";
+import { resolveOwner } from "./lib/owner";
 
 export const commit = mutation({
   args: {
