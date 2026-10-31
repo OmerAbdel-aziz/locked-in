@@ -46,6 +46,7 @@ export function NavPill() {
       className="flex items-center gap-1 rounded-full bg-surface-container-low/60 p-1 text-xs font-semibold"
     >
       <RouteItem href="/" label="Focus" />
+      <RouteItem href="/careers" label="Careers" />
       <RouteItem href="/stats" label="Stats" />
       <SettingsDialog variant="tab" />
     </nav>
