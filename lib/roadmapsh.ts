@@ -43,8 +43,8 @@ export interface ParsedRoadmap {
   milestones: ParsedMilestone[];
 }
 
-function unitTitle(n: RoadmapShNode): string {
-  return (String(n.title ?? n.name ?? "")).trim();
+function unitTitle(n: any): string {
+  return String(n.title ?? n.name ?? n.data?.label ?? "").trim();
 }
 
 function unitEstimate(n: RoadmapShNode): number {
@@ -66,7 +66,10 @@ function parseNode(n: RoadmapShNode): ParsedUnit | null {
 }
 
 export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
-  const name = (String(payload.title ?? payload.name ?? "Imported roadmap")).trim() || "Imported roadmap";
+  const rawTitle = payload.title ?? payload.name;
+  const name = (typeof rawTitle === "object" && rawTitle !== null
+    ? (rawTitle.page ?? rawTitle.card ?? rawTitle.label ?? "Imported roadmap")
+    : rawTitle ?? "Imported roadmap").toString().trim() || "Imported roadmap";
 
   const groups: RoadmapShGroup[] =
     payload.groups ?? payload.children ?? [];
@@ -85,7 +88,9 @@ export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
   }
 
   // Top-level nodes (not in any group) become their own milestone.
-  const topNodes = payload.nodes ?? [];
+  const topNodes = (payload.nodes ?? []).filter((n: any) =>
+    n.type === "topic" || n.type === "subtopic",
+  );
   const topUnits = topNodes.map(parseNode).filter((u): u is ParsedUnit => u !== null);
   if (topUnits.length > 0) {
     milestones.push({ name: "General", units: topUnits });
