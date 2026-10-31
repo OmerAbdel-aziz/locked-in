@@ -53,6 +53,7 @@ import { ProjectManager } from "@/components/projects/project-manager";
 import { ProjectOverview } from "@/components/projects/overview";
 import { MilestonePanel } from "./milestone-panel";
 import { RoadmapImportPanel } from "./roadmap-import-panel";
+import { TemplatePanel } from "./template-panel";
 
 import { TaskList, type TaskRow } from "./task-list";
 
@@ -356,6 +357,9 @@ export function TaskPanel() {
           project's derived overview (Task 14): the filtered list above is
           the overview's task list, so the card carries only the numbers. */}
       <RoadmapImportPanel />
+      {filterProjectId === null ? null : (
+        <TemplatePanel projectId={filterProjectId} />
+      )}
       <ProjectManager />
       {filterProjectId === null ? null : (
         <>

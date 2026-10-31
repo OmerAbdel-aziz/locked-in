@@ -43,8 +43,9 @@ export interface ParsedRoadmap {
   milestones: ParsedMilestone[];
 }
 
-function unitTitle(n: any): string {
-  return String(n.title ?? n.name ?? n.data?.label ?? "").trim();
+function unitTitle(n: unknown): string {
+  const o = n as { title?: unknown; name?: unknown; data?: { label?: unknown } };
+  return String(o.title ?? o.name ?? o.data?.label ?? "").trim();
 }
 
 function unitEstimate(n: RoadmapShNode): number {
@@ -65,9 +66,12 @@ function parseNode(n: RoadmapShNode): ParsedUnit | null {
 }
 
 export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
-  const rawTitle: any = payload.title ?? payload.name;
+  const rawTitle: unknown = payload.title ?? payload.name;
   const name = (typeof rawTitle === "object" && rawTitle !== null
-    ? (rawTitle.page ?? rawTitle.card ?? rawTitle.label ?? "Imported roadmap")
+    ? ((rawTitle as { page?: unknown; card?: unknown; label?: unknown }).page ??
+       (rawTitle as { page?: unknown; card?: unknown; label?: unknown }).card ??
+       (rawTitle as { page?: unknown; card?: unknown; label?: unknown }).label ??
+       "Imported roadmap")
     : rawTitle ?? "Imported roadmap").toString().trim() || "Imported roadmap";
 
   const groups: RoadmapShGroup[] =
@@ -86,8 +90,8 @@ export function parseRoadmapSh(payload: RoadmapShPayload): ParsedRoadmap {
     }
   }
 
-  const topNodes = (payload.nodes ?? []).filter((n: any) =>
-    n.type === "topic" || n.type === "subtopic",
+  const topNodes = (payload.nodes ?? []).filter((n: unknown) =>
+    (n as {type?:string}).type === "topic" || (n as {type?:string}).type === "subtopic",
   );
   const topUnits = topNodes.map(parseNode).filter((u): u is ParsedUnit => u !== null);
   if (topUnits.length > 0) {

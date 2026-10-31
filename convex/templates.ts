@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { orderBetween } from "./lib/order";
 import { resolveOwner } from "./lib/owner";
 
 const LIST_LIMIT = 1000;
@@ -111,7 +110,31 @@ export const fork = mutation({
     const t = await ctx.db.get(args.templateId);
     if (t === null || t.hidden || t.deletedAt !== undefined) throw new Error("templates: not found");
 
-    const data = t.data as any;
+    const data = t.data as {
+      projectName?: string;
+      planWeeklyFocusHours?: number;
+      milestones?: Array<{
+        name: string;
+        order?: number;
+        units?: Array<{
+          title: string;
+          estimate?: number;
+          known?: boolean;
+          order?: number;
+        }>;
+      }>;
+      rungs?: Array<{
+        title: string;
+        company?: string;
+        payMin?: number;
+        payMax?: number;
+        requirements?: string[];
+        degreeMention?: boolean;
+        sideDoor?: boolean;
+        order?: number;
+        milestoneIndexes?: number[];
+      }>;
+    };
     const projectId = await ctx.db.insert("projects", {
       ownerId,
       name: `${data.projectName ?? t.name} (fork)`,

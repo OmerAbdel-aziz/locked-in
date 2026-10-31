@@ -47,6 +47,7 @@ export function NavPill() {
     >
       <RouteItem href="/" label="Focus" />
       <RouteItem href="/careers" label="Careers" />
+      <RouteItem href="/templates" label="Templates" />
       <RouteItem href="/stats" label="Stats" />
       <SettingsDialog variant="tab" />
     </nav>
