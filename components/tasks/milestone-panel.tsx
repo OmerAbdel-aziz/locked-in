@@ -18,9 +18,13 @@ import type { Id } from "@/convex/_generated/dataModel";
  */
 export function MilestonePanel({ projectId }: { projectId: Id<"projects"> }) {
   const progress = useQuery(api.milestones.progress, { projectId });
+  const activeTaskId = useQuery(api.tasks.activeTask, {});
   const create = useMutation(api.milestones.create);
   const rename = useMutation(api.milestones.rename);
   const archive = useMutation(api.milestones.archive);
+  const selectTask = useMutation(api.tasks.selectTask);
+  const complete = useMutation(api.tasks.complete);
+  const uncomplete = useMutation(api.tasks.uncomplete);
 
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -113,16 +117,48 @@ export function MilestonePanel({ projectId }: { projectId: Id<"projects"> }) {
                 ) : (
                   <ul className="mt-2 space-y-1">
                     {units.map((unit) => (
-                      <li
-                        key={unit._id}
-                        className={
-                          unit.activeFlag
-                            ? "text-sm text-on-surface"
-                            : "text-sm text-on-surface-variant line-through opacity-60"
-                        }
-                      >
-                        {unit.title}
-                        {unit.known === true ? " · known" : ""}
+                      <li key={unit._id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={
+                            unit.activeFlag
+                              ? `Complete ${unit.title}`
+                              : `Reopen ${unit.title}`
+                          }
+                          className="h-4 w-4 rounded-sm bg-surface-container-highest"
+                          onClick={() => {
+                            const call = unit.activeFlag ? complete : uncomplete;
+                            void call({ taskId: unit._id }).catch((error) => {
+                              console.error(
+                                "locked-in: could not update unit",
+                                error,
+                              );
+                            });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          aria-pressed={activeTaskId === unit._id}
+                          className={
+                            unit.activeFlag
+                              ? activeTaskId === unit._id
+                                ? "text-sm text-primary"
+                                : "text-sm text-on-surface"
+                              : "text-sm text-on-surface-variant line-through opacity-60"
+                          }
+                          onClick={() => {
+                            const next = activeTaskId === unit._id ? null : unit._id;
+                            void selectTask({ taskId: next }).catch((error) => {
+                              console.error(
+                                "locked-in: could not select unit",
+                                error,
+                              );
+                            });
+                          }}
+                        >
+                          {unit.title}
+                          {unit.known === true ? " · known" : ""}
+                        </button>
                       </li>
                     ))}
                   </ul>

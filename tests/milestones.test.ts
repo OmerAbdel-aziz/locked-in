@@ -233,4 +233,49 @@ describe("milestones", () => {
       }),
     ).rejects.toThrow(/exhausted/);
   });
+
+  it("snapshots a unit-bound session and leaves unbound sessions legal", async () => {
+    const { t, projectId } = await world();
+    const milestone = await t.mutation(api.milestones.create, {
+      projectId,
+      name: "M1",
+    });
+    const unit = await t.mutation(api.tasks.create, {
+      title: "Unit",
+      estimate: 2,
+      projectId,
+    });
+    await t.mutation(api.milestones.linkUnit, {
+      taskId: unit,
+      milestoneId: milestone,
+    });
+    await t.mutation(api.tasks.selectTask, { taskId: unit });
+
+    const startedAt = 1_700_000_000_000;
+    const completedAt = startedAt + 25 * 60_000;
+
+    // Bound: the row carries the unit and its project snapshot.
+    await t.mutation(api.sessions.logCompleted, {
+      phase: "focus",
+      startedAt,
+      completedAt,
+      tzOffsetAtCompletion: 0,
+      taskId: unit,
+      projectId,
+    });
+
+    // Unbound stays legal and simply never distinguishes itself.
+    await t.mutation(api.sessions.logCompleted, {
+      phase: "focus",
+      startedAt: completedAt + 1,
+      completedAt: completedAt + 25 * 60_000,
+      tzOffsetAtCompletion: 0,
+    });
+
+    const log = await t.query(api.sessions.exportLog, {});
+    const bound = log.find((s) => s.task === "Unit");
+    const unbound = log.find((s) => s.task === "");
+    expect(bound?.project).toBe("Backend Roadmap");
+    expect(unbound).toBeTruthy();
+  });
 });
