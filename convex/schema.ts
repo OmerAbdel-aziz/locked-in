@@ -105,6 +105,8 @@ export default defineSchema({
     ownerId: v.id("users"),
     name: v.string(),
     archivedAt: v.optional(v.number()),
+    /** Plan (D-3): weekly focus-hour target for this roadmap. Null-safe default = unset. */
+    planWeeklyFocusHours: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
     // Merge dedupes projects by name case-insensitively (ADR-002).
@@ -115,6 +117,10 @@ export default defineSchema({
     title: v.string(),
     /** Points at a `projects` row. */
     projectId: v.optional(v.id("projects")),
+    /** Points at a `milestones` row (v2 roadmap spine). Null-safe default = unset. */
+    milestoneId: v.optional(v.id("milestones")),
+    /** Per-unit "already known" flag (v2). Null-safe default = false. */
+    known: v.optional(v.boolean()),
     /** Pomodoro leaves, 0–8 (range enforced in the mutation, not the validator). */
     estimate: v.number(),
     /** Fractional rank — insert between neighbours, never renumber the list. */
@@ -197,6 +203,41 @@ export default defineSchema({
     /** Client clock at the last boundary — diagnostic, never authoritative. */
     updatedAt: v.number(),
   }).index("by_owner", ["ownerId"]),
+
+  /**
+   * v2 roadmap spine: Milestones group Units within a Roadmap (project).
+   * Null-safe defaults so existing data reads identically.
+   */
+  milestones: defineTable({
+    ownerId: v.id("users"),
+    projectId: v.id("projects"),
+    name: v.string(),
+    /** Fractional rank — same machinery as tasks.order. */
+    order: v.number(),
+    archivedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_project", ["ownerId", "projectId"]),
+
+  /**
+   * v2 career ladder: Rungs attached to a Roadmap.
+   */
+  rungs: defineTable({
+    ownerId: v.id("users"),
+    projectId: v.id("projects"),
+    title: v.string(),
+    company: v.optional(v.string()),
+    payMin: v.optional(v.number()),
+    payMax: v.optional(v.number()),
+    requirements: v.optional(v.array(v.string())),
+    degreeMention: v.optional(v.boolean()),
+    sideDoor: v.optional(v.boolean()),
+    /** Milestone ids this rung draws on. */
+    milestoneIds: v.optional(v.array(v.id("milestones"))),
+    order: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_project", ["ownerId", "projectId"]),
 
   /** One row per owner, written lazily on first use. */
   settings: defineTable({
