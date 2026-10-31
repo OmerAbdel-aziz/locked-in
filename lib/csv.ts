@@ -20,7 +20,7 @@
  */
 
 export const CSV_HEADER =
-  "startedAt,completedAt,phase,task,project,tzOffsetAtCompletion";
+  "startedAt,completedAt,phase,unit,roadmap,tzOffsetAtCompletion";
 
 export type CsvPhase = "focus" | "short" | "long";
 
@@ -133,9 +133,19 @@ export function parseSessionsCsv(text: string): {
   }
   const header = splitLine(lines[0]).map((h) => h.trim());
   const expected = CSV_HEADER.split(",");
+  // Accept both the new vocabulary and the legacy "task"/"project" headers.
+  const legacy = [
+    "startedAt",
+    "completedAt",
+    "phase",
+    "task",
+    "project",
+    "tzOffsetAtCompletion",
+  ];
   const headerOk =
     header.length === expected.length &&
-    header.every((h, i) => h === expected[i]);
+    (header.every((h, i) => h === expected[i]) ||
+      header.every((h, i) => h === legacy[i]));
   if (!headerOk) {
     return {
       rows,

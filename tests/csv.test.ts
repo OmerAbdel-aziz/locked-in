@@ -24,8 +24,8 @@ describe("CSV 6-col format (Q7b)", () => {
       "startedAt",
       "completedAt",
       "phase",
-      "task",
-      "project",
+      "unit",
+      "roadmap",
       "tzOffsetAtCompletion",
     ]);
   });
