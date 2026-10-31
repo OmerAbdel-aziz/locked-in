@@ -278,4 +278,53 @@ describe("milestones", () => {
     expect(bound?.project).toBe("Backend Roadmap");
     expect(unbound).toBeTruthy();
   });
+
+  it("computes next-up and advances when units complete or are marked known", async () => {
+    const { t, projectId } = await world();
+    const milestone = await t.mutation(api.milestones.create, {
+      projectId,
+      name: "M1",
+    });
+    const a = await t.mutation(api.tasks.create, {
+      title: "A",
+      estimate: 1,
+      projectId,
+    });
+    const b = await t.mutation(api.tasks.create, {
+      title: "B",
+      estimate: 1,
+      projectId,
+    });
+    const c = await t.mutation(api.tasks.create, {
+      title: "C",
+      estimate: 1,
+      projectId,
+    });
+    for (const unit of [a, b, c]) {
+      await t.mutation(api.milestones.linkUnit, {
+        taskId: unit,
+        milestoneId: milestone,
+      });
+    }
+
+    // Started-from-zero: the first unit in order.
+    let next = await t.query(api.milestones.nextUp, { projectId });
+    expect(next?.unit._id).toBe(a);
+
+    // Marking A known advances to B.
+    await t.mutation(api.tasks.update, { taskId: a, known: true });
+    next = await t.query(api.milestones.nextUp, { projectId });
+    expect(next?.unit._id).toBe(b);
+
+    // Completing B advances to C.
+    await t.mutation(api.tasks.complete, { taskId: b });
+    next = await t.query(api.milestones.nextUp, { projectId });
+    expect(next?.unit._id).toBe(c);
+
+    // Completing everything yields null.
+    await t.mutation(api.tasks.complete, { taskId: c });
+    await t.mutation(api.tasks.update, { taskId: a, known: true });
+    next = await t.query(api.milestones.nextUp, { projectId });
+    expect(next).toBeNull();
+  });
 });

@@ -85,6 +85,58 @@ export const list = query({
  * matching the PRD's distinction that known affects "percent known", not
  * "percent complete".
  */
+/**
+ * The advisory "Next up" pointer for a roadmap: the first incomplete,
+ * non-known unit in roadmap order (milestones first, then their units; units
+ * with no milestone trail at the end). Derived at read time only — nothing
+ * is stored, per ADR-003.
+ */
+export const nextUp = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const ownerId = await resolveOwner(ctx);
+    await requireOwnedProject(ctx, ownerId, args.projectId);
+
+    const milestones = await bucketMilestones(ctx, ownerId, args.projectId)
+      .take(LIST_LIMIT);
+    const activeMilestones = milestones
+      .filter((m) => m.archivedAt === undefined)
+      .sort((a, b) => a.order - b.order);
+
+    // Units without a milestone trail at the very end, in their own order.
+    const unassigned = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_task_project", (q) =>
+        q.eq("ownerId", ownerId).eq("projectId", args.projectId),
+      )
+      .take(LIST_LIMIT);
+    const unassignedUnits = unassigned
+      .filter((u) => u.milestoneId === undefined && u.activeFlag && u.known !== true)
+      .sort((a, b) => a.order - b.order);
+
+    for (const milestone of activeMilestones) {
+      const units = await ctx.db
+        .query("tasks")
+        .withIndex("by_owner_milestone", (q) =>
+          q.eq("ownerId", ownerId).eq("milestoneId", milestone._id),
+        )
+        .take(LIST_LIMIT);
+      const candidate = units
+        .filter((u) => u.activeFlag && u.known !== true)
+        .sort((a, b) => a.order - b.order)[0];
+      if (candidate) {
+        return { milestone, unit: candidate };
+      }
+    }
+
+    const candidate = unassignedUnits[0];
+    if (candidate) {
+      return { milestone: null, unit: candidate };
+    }
+    return null;
+  },
+});
+
 export const progress = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {

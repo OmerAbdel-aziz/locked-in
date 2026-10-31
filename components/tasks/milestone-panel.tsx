@@ -18,6 +18,7 @@ import type { Id } from "@/convex/_generated/dataModel";
  */
 export function MilestonePanel({ projectId }: { projectId: Id<"projects"> }) {
   const progress = useQuery(api.milestones.progress, { projectId });
+  const nextUp = useQuery(api.milestones.nextUp, { projectId });
   const activeTaskId = useQuery(api.tasks.activeTask, {});
   const create = useMutation(api.milestones.create);
   const rename = useMutation(api.milestones.rename);
@@ -54,6 +55,34 @@ export function MilestonePanel({ projectId }: { projectId: Id<"projects"> }) {
 
   return (
     <section aria-label="Roadmap milestones" className="space-y-3">
+      {nextUp === undefined ? null : nextUp === null ? (
+        <p className="rounded-xl bg-surface-container-low/50 px-4 py-3 text-sm text-on-surface-variant/70">
+          Nothing left to do — roadmap complete.
+        </p>
+      ) : (
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-container-low p-3">
+          <div>
+            <div className="text-xs font-mono text-on-surface-variant">
+              NEXT UP
+            </div>
+            <div className="text-sm text-on-surface">
+              {nextUp.unit.title}
+              {nextUp.milestone ? ` · ${nextUp.milestone.name}` : ""}
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onPress={() => {
+              void selectTask({ taskId: nextUp.unit._id }).catch((error) => {
+                console.error("locked-in: could not bind next up", error);
+              });
+            }}
+          >
+            Confirm &amp; bind
+          </Button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Input
           aria-label="New milestone"
