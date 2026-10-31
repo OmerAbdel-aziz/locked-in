@@ -60,7 +60,10 @@ export const commit = mutation({
 export const importFromUrl = action({
   args: { url: v.string() },
   handler: async (ctx, args) => {
-    const res = await fetch(args.url);
+    const url = args.url.trim().endsWith(".json")
+      ? args.url.trim()
+      : `${args.url.trim().replace(/\/$/, "")}.json`;
+    const res = await fetch(url);
     if (!res.ok) {
       throw new Error(`roadmap.sh import: fetch failed (${res.status})`);
     }
