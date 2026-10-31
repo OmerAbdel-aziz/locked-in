@@ -51,6 +51,7 @@ import { useTimerStore, type ActiveTask } from "@/lib/store/timer";
 import { ProjectFilter } from "@/components/projects/filter";
 import { ProjectManager } from "@/components/projects/project-manager";
 import { ProjectOverview } from "@/components/projects/overview";
+import { MilestonePanel } from "./milestone-panel";
 
 import { TaskList, type TaskRow } from "./task-list";
 
@@ -355,7 +356,10 @@ export function TaskPanel() {
           the overview's task list, so the card carries only the numbers. */}
       <ProjectManager />
       {filterProjectId === null ? null : (
-        <ProjectOverview projectId={filterProjectId} />
+        <>
+          <MilestonePanel projectId={filterProjectId} />
+          <ProjectOverview projectId={filterProjectId} />
+        </>
       )}
     </>
   );

@@ -133,7 +133,8 @@ export default defineSchema({
     // fractional order — this is the task list's hot path.
     .index("by_owner_active", ["ownerId", "activeFlag", "order"])
     .index("by_owner", ["ownerId"])
-    .index("by_owner_task_project", ["ownerId", "projectId"]),
+    .index("by_owner_task_project", ["ownerId", "projectId"])
+    .index("by_owner_milestone", ["ownerId", "milestoneId"]),
 
   /**
    * The canonical data: an append-only log written once when a phase ends
@@ -217,7 +218,8 @@ export default defineSchema({
     archivedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
-    .index("by_owner_project", ["ownerId", "projectId"]),
+    .index("by_owner_project", ["ownerId", "projectId"])
+    .index("by_owner_project_order", ["ownerId", "projectId", "order"]),
 
   /**
    * v2 career ladder: Rungs attached to a Roadmap.

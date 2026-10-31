@@ -14,6 +14,7 @@ import type * as lib_merge from "../lib/merge.js";
 import type * as lib_order from "../lib/order.js";
 import type * as lib_owner from "../lib/owner.js";
 import type * as merge from "../merge.js";
+import type * as milestones from "../milestones.js";
 import type * as projects from "../projects.js";
 import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   "lib/order": typeof lib_order;
   "lib/owner": typeof lib_owner;
   merge: typeof merge;
+  milestones: typeof milestones;
   projects: typeof projects;
   sessions: typeof sessions;
   settings: typeof settings;

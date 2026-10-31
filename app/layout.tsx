@@ -26,7 +26,11 @@ export const metadata: Metadata = {
   description: "A calm pomodoro focus app — deep work sanctuary.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     // Mint dark is the default theme (Phase 3.5): the product has always
     // been dark, and the attribute is what resolves the HeroUI tokens below.

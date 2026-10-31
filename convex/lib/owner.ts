@@ -93,6 +93,19 @@ export async function requireOwnedTask(
   return task;
 }
 
+/** Same contract as `requireOwnedTask`, for a v2 milestone. */
+export async function requireOwnedMilestone(
+  ctx: OwnerCtx,
+  ownerId: Id<"users">,
+  milestoneId: Id<"milestones">,
+): Promise<Doc<"milestones">> {
+  const milestone = await ctx.db.get(milestoneId);
+  if (milestone === null || milestone.ownerId !== ownerId) {
+    throw new Error("milestones: milestone not found");
+  }
+  return milestone;
+}
+
 /** Same contract as `requireOwnedTask`, for a project a task is filed under. */
 export async function requireOwnedProject(
   ctx: OwnerCtx,

@@ -15,6 +15,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { orderBetween } from "./lib/order";
 import {
+  requireOwnedMilestone,
   requireOwnedProject,
   requireOwnedTask,
   resolveOwner,
@@ -114,6 +115,7 @@ export const create = mutation({
     title: v.string(),
     estimate: v.number(),
     projectId: v.optional(v.id("projects")),
+    milestoneId: v.optional(v.id("milestones")),
   },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
@@ -121,6 +123,19 @@ export const create = mutation({
     const estimate = validEstimate(args.estimate);
     if (args.projectId !== undefined) {
       await requireOwnedProject(ctx, ownerId, args.projectId);
+    }
+    if (args.milestoneId !== undefined) {
+      const milestone = await requireOwnedMilestone(
+        ctx,
+        ownerId,
+        args.milestoneId,
+      );
+      if (
+        args.projectId !== undefined &&
+        milestone.projectId !== args.projectId
+      ) {
+        throw new Error("tasks: milestone does not belong to that project");
+      }
     }
 
     const last = await lastOpenTask(ctx, ownerId);
@@ -130,6 +145,7 @@ export const create = mutation({
       title,
       estimate,
       projectId: args.projectId,
+      milestoneId: args.milestoneId,
       // Appending has no right-hand neighbour, so it extends the list rather
       // than splitting a gap — the reason `APPEND_STEP` is wide.
       order: orderBetween(last === null ? null : last.order, null),
@@ -152,6 +168,8 @@ export const update = mutation({
     title: v.optional(v.string()),
     estimate: v.optional(v.number()),
     projectId: v.optional(v.union(v.id("projects"), v.null())),
+    milestoneId: v.optional(v.union(v.id("milestones"), v.null())),
+    known: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const ownerId = await resolveOwner(ctx);
@@ -174,6 +192,28 @@ export const update = mutation({
         await requireOwnedProject(ctx, ownerId, args.projectId);
         patch.projectId = args.projectId;
       }
+    }
+    if (args.milestoneId !== undefined) {
+      if (args.milestoneId === null) {
+        patch.milestoneId = undefined;
+      } else {
+        const milestone = await requireOwnedMilestone(
+          ctx,
+          ownerId,
+          args.milestoneId,
+        );
+        const projectId = patch.projectId ?? task.projectId;
+        if (projectId !== undefined && milestone.projectId !== projectId) {
+          throw new Error("tasks: milestone does not belong to that project");
+        }
+        patch.milestoneId = args.milestoneId;
+        if (patch.projectId === undefined) {
+          patch.projectId = milestone.projectId;
+        }
+      }
+    }
+    if (args.known !== undefined) {
+      patch.known = args.known;
     }
 
     if (Object.keys(patch).length > 0) {
