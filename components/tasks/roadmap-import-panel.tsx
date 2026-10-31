@@ -1,28 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { Button, Input } from "@heroui/react";
 
 import { api } from "@/convex/_generated/api";
-import { parseRoadmapSh } from "@/lib/roadmapsh";
 
 export function RoadmapImportPanel() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  const commit = useMutation(api.roadmapImport.commit);
+  const importFromUrl = useAction(api.roadmapImport.importFromUrl);
 
   async function run() {
-    setStatus("Fetching…");
+    setStatus("Importing…");
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`fetch failed (${res.status})`);
-      const payload = await res.json();
-      const parsed = parseRoadmapSh(payload);
-      const projectId = await commit({
-        name: parsed.name,
-        milestones: parsed.milestones,
-      });
+      const projectId = await importFromUrl({ url });
       setStatus(`Imported roadmap ${projectId}`);
       setUrl("");
     } catch (error) {

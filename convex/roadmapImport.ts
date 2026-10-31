@@ -1,5 +1,8 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { action, mutation } from "./_generated/server";
+import { api } from "./_generated/api";
+import { parseRoadmapSh } from "./lib/roadmapsh";
 import { resolveOwner } from "./lib/owner";
 
 export const commit = mutation({
@@ -50,6 +53,23 @@ export const commit = mutation({
       }
     }
 
+    return projectId;
+  },
+});
+
+export const importFromUrl = action({
+  args: { url: v.string() },
+  handler: async (ctx, args) => {
+    const res = await fetch(args.url);
+    if (!res.ok) {
+      throw new Error(`roadmap.sh import: fetch failed (${res.status})`);
+    }
+    const payload = await res.json();
+    const parsed = parseRoadmapSh(payload);
+    const projectId: Id<"projects"> = await ctx.runMutation(api.roadmapImport.commit, {
+      name: parsed.name,
+      milestones: parsed.milestones,
+    });
     return projectId;
   },
 });
